@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Admin - Hệ Thống Xếp Giường</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .bg-striped-blocked { background-color: #f8fafc; background-image: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 10px, #e2e8f0 10px, #e2e8f0 20px); }
+        .ws-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .ws-connected { background: #22c55e; }
+        .ws-disconnected { background: #ef4444; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-500 text-white p-2.5 rounded-xl shadow-md">
+                    <i class="fa-solid fa-bed-pulse text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900">Admin - Xếp Giường Truyền</h1>
+                    <p class="text-xs text-slate-500">
+                        <span class="ws-status ws-connected" id="wsIndicator"></span>
+                        <span id="wsStatusText" class="text-emerald-600 font-semibold">Đồng bộ realtime</span>
+                        <span class="ml-3 text-slate-400">|</span>
+                        <a href="/sales.html" target="_blank" class="ml-2 text-emerald-600 hover:text-emerald-700 font-semibold">
+                            <i class="fa-solid fa-eye"></i> Mở Sales View
+                        </a>
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                    <button onclick="undoLastChange()" id="undoBtn" class="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-arrow-rotate-left"></i> Undo
+                    </button>
+                    <button onclick="resetData()" class="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-2">
+                        <i class="fa-solid fa-rotate-left"></i> Khôi phục mẫu
+                    </button>
+                </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT COL -->
+        <section class="lg:col-span-4 space-y-6">
+
+            <!-- GOOGLE SHEET SYNC -->
+            <div class="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-2xl shadow-lg border border-slate-800 p-4 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800/60 pb-3">
+                    <h3 class="font-bold text-emerald-300 flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel text-emerald-400"></i> Đồng bộ Google Sheet
+                    </h3>
+                </div>
+                <div class="space-y-3 text-xs">
+                    <!-- Fixed link sync -->
+                    <div class="bg-slate-900/50 rounded-lg p-3 border border-slate-800">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-link text-emerald-400"></i>
+                            <span class="font-semibold text-slate-300">Link lịch cố định:</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mb-2 truncate">https://docs.google.com/spreadsheets/d/1UeHny32B0dOb...</div>
+                        <button onclick="syncFromSheetLink()" id="syncLinkBtn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-semibold flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Lấy dữ liệu từ Sheet
+                        </button>
+                    </div>
+                    <div class="relative flex items-center gap-2 text-slate-500">
+                        <hr class="flex-1 border-slate-800"><span class="text-[10px]">HOẶC DÁN NHANH</span><hr class="flex-1 border-slate-800">
+                    </div>
+                    <textarea id="pasteDataArea" rows="2" placeholder="Copy từ sheet → Ctrl+V vào đây..." class="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-900 focus:ring-2 focus:ring-emerald-400 custom-scrollbar"></textarea>
+                    <button onclick="parsePastedData()" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Phân tích & Đồng bộ
+                    </button>
+                </div>
+                <div id="syncFeedback" class="hidden text-xs p-2 rounded-lg border flex items-start gap-2"></div>
+            </div>
+
+            <!-- TIMING SIMULATOR -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-4 shadow-sm">
+                <h3 class="font-semibold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <i class="fa-solid fa-vial-circle-check text-emerald-500"></i> Tra Cứu Quy Tắc
+                </h3>
+                <input id="ruleTesterInput" oninput="testRule(this.value)" type="text" placeholder="Gõ thử: Đơn d/c BS Dũng, MSC..." class="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-emerald-500">
+                <div id="ruleTesterResult" class="hidden text-xs bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 space-y-1"></div>
+            </div>
+
+            <!-- RULES MANAGER -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div onclick="this.nextElementSibling.classList.toggle('hidden')" class="p-4 cursor-pointer flex justify-between items-center hover:bg-slate-50">
+                    <h3 class="font-semibold text-slate-900 text-sm"><i class="fa-solid fa-book text-emerald-500 mr-2"></i> Kho Quy Tắc Giờ Hẹn</h3>
+                    <i class="fa-solid fa-chevron-down text-slate-400"></i>
+                </div>
+                <div id="rulesPanel" class="p-4 space-y-3 border-t border-slate-100">
+                    <div class="flex gap-2 flex-wrap items-center text-xs">
+                        <input id="ruleKeyword" placeholder="Từ khóa (VD: MSC)" class="px-2 py-1.5 border rounded-lg w-24">
+                        <input id="ruleLabel" placeholder="Nhãn" class="px-2 py-1.5 border rounded-lg w-28">
+                        <input id="ruleWait" type="number" placeholder="Chờ (p)" class="px-2 py-1.5 border rounded-lg w-20">
+                        <input id="ruleExec" type="number" placeholder="Truyền (p)" class="px-2 py-1.5 border rounded-lg w-22">
+                        <label class="flex items-center gap-1"><input id="ruleT2" type="checkbox" class="rounded"> T2</label>
+                        <input id="rulePriority" type="number" placeholder="Ưu tiên" class="px-2 py-1.5 border rounded-lg w-20">
+                        <input type="hidden" id="editRuleId" value="">
+                        <button onclick="addRule()" class="px-3 py-1.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 text-xs"><i class="fa-solid fa-plus"></i> Thêm</button>
+                        <button onclick="clearRuleForm()" class="px-3 py-1.5 bg-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-300 text-xs hidden" id="cancelRuleBtn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div id="rulesTable" class="text-xs space-y-1 max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- ADD CUSTOMER FORM -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-user-plus text-emerald-500"></i> Đăng ký Thủ Công
+                </h3>
+                <form id="customerForm" onsubmit="addCustomer(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Tên khách hàng (Hậu tố V/VV = VIP)</label>
+                        <input id="custName" type="text" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Ngày hẹn</label>
+                            <input id="custDate" type="date" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Giờ đến</label>
+                            <input id="custArrivalTime" type="time" required value="09:00" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Dịch vụ</label>
+                            <input id="custProduct" type="text" required placeholder="MSC, Đơn thuốc..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Ưu tiên</label>
+                            <select id="custPriority" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white">
+                                <option value="1">Thường</option>
+                                <option value="2">Thân Thiết</option>
+                                <option value="3">VIP (Mức 3)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">Chế độ phòng T2</label>
+                        <select id="custVipRoomMode" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white">
+                            <option value="none">Ghép phòng bình thường</option>
+                            <option value="single">Khóa 1 Mình 1 Phòng</option>
+                            <option value="couple">Bao Phòng Couple</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg text-sm transition-colors">
+                        Thêm Vào Lịch
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                <span class="text-xs font-bold text-slate-700">Cộng thời gian Chờ vào Nằm giường?</span>
+                <input type="checkbox" id="toggleIncludeWaitTime" onchange="toggleWaitTime()" checked class="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500">
+            </div>
+
+        </section>
+
+        <!-- RIGHT COL -->
+        <section class="lg:col-span-8 space-y-6">
+
+            <!-- DATE FILTER - WEEK VIEW -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><i class="fa-regular fa-calendar-check text-xl"></i></div>
+                        <h4 class="font-bold text-sm">Lịch Tuần</h4>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="weekNav(-1)" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="Tuần trước"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="weekLabel" class="text-xs font-semibold text-slate-600 min-w-[140px] text-center"></span>
+                        <button onclick="weekNav(1)" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="Tuần sau"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button onclick="weekNav(0)" class="ml-1 text-[10px] text-emerald-600 hover:text-emerald-700 font-semibold">Hôm nay</button>
+                    </div>
+                </div>
+                <div id="weekDays" class="grid grid-cols-7 gap-1.5 text-center"></div>
+                <select id="dateFilterSelect" onchange="changeDate(this.value)" class="hidden w-48 px-3 py-2 text-sm font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-emerald-500"></select>
+            </div>
+
+            <!-- STATS -->
+            <div class="grid grid-cols-4 gap-4">
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 flex items-center gap-3 shadow-sm">
+                    <div class="p-2 rounded-lg bg-blue-50 text-blue-500"><i class="fa-solid fa-users"></i></div>
+                    <div><p class="text-[10px] font-medium text-slate-400">Khách</p><p id="statTotalCust" class="text-base font-bold">0</p></div>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 flex items-center gap-3 shadow-sm">
+                    <div class="p-2 rounded-lg bg-amber-50 text-amber-500"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    <div><p class="text-[10px] font-medium text-slate-400">Chờ TB</p><p id="statAvgWait" class="text-base font-bold">0p</p></div>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 flex items-center gap-3 shadow-sm">
+                    <div class="p-2 rounded-lg bg-emerald-50 text-emerald-500"><i class="fa-solid fa-percent"></i></div>
+                    <div><p class="text-[10px] font-medium text-slate-400">Hiệu suất</p><p id="statUtilization" class="text-base font-bold">0%</p></div>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 flex items-center gap-3 shadow-sm">
+                    <div class="p-2 rounded-lg bg-rose-50 text-rose-500"><i class="fa-solid fa-hourglass-start"></i></div>
+                    <div><p class="text-[10px] font-medium text-slate-400">Trễ</p><p id="statDelayedCount" class="text-base font-bold">0</p></div>
+                </div>
+            </div>
+
+            <!-- GANTT CHART -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-semibold text-slate-900 flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-chart-gantt text-emerald-500"></i> Biểu Đồ Gantt
+                    </h3>
+                    <div class="flex gap-3 text-[10px] font-medium">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-violet-100 border border-violet-400"></span> VIP/Đặc quyền</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded border border-dashed border-emerald-500"></span> Sửa đè tay</span>
+                    </div>
+                </div>
+                <div class="p-4 overflow-x-auto custom-scrollbar">
+                    <div class="min-w-[1200px] relative pb-4">
+                        <div class="grid grid-cols-11 border-b border-slate-200 pb-2 mb-4 text-xs font-semibold text-slate-400 text-center">
+                            <div class="col-span-1 text-left pl-2">GIƯỜNG</div>
+                            <div class="col-span-10 grid grid-cols-10 text-center">
+                                <div>08:00</div><div>09:00</div><div>10:00</div><div>11:00</div><div>12:00</div><div>13:00</div><div>14:00</div><div>15:00</div><div>16:00</div><div>17:00</div>
+                            </div>
+                        </div>
+                        <div class="space-y-4 relative">
+                            <div id="bgGridLines" class="absolute inset-y-0 left-[9.09%] right-0 grid grid-cols-10 pointer-events-none z-0"></div>
+                            <div id="dynamicBedLanes" class="space-y-3 relative z-10"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLE -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center flex-wrap gap-2">
+                    <h3 class="font-semibold text-slate-900 text-sm"><i class="fa-solid fa-list-check text-emerald-500 mr-2"></i> Danh Sách Chi Tiết</h3>
+                    <div class="flex items-center gap-2">
+                        <button onclick="groupSelected()" class="text-[11px] font-bold px-3 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-40" id="groupBtn" disabled><i class="fa-solid fa-people-arrows mr-1"></i> Ghép nhóm</button>
+                        <button onclick="ungroupSelected()" class="text-[11px] font-bold px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 disabled:opacity-40" id="ungroupBtn" disabled><i class="fa-solid fa-chain-broken mr-1"></i> Rã nhóm</button>
+                        <span class="text-xs font-medium text-slate-500" id="custTableCount">0 khách</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                        <thead class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase border-b border-slate-100">
+                            <tr>
+                                <th class="p-3 w-8"><input type="checkbox" id="checkAll" onchange="toggleAllChecks(this.checked)" class="rounded"></th>
+                                <th class="p-3">Khách Hàng / Chế độ</th><th class="p-3">Hạng</th><th class="p-3">Dịch Vụ</th><th class="p-3">Hẹn</th>
+                                <th class="p-3">Xếp Giường</th><th class="p-3">Trạng Thái</th><th class="p-3 text-center">Xử lý</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientTableBody" class="divide-y divide-slate-100 text-xs"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- EDIT MODAL -->
+    <div id="editModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="p-5 border-b border-slate-100 flex justify-between">
+                <h3 class="font-bold text-slate-900"><i class="fa-solid fa-user-pen text-emerald-500"></i> Điều chỉnh đè lịch</h3>
+                <button onclick="closeEdit()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4 text-sm">
+                <input type="hidden" id="editId">
+                <div><label class="block font-semibold mb-1 text-xs">Khách hàng</label><input id="editName" disabled class="w-full px-3 py-2 bg-slate-50 border rounded-lg"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold mb-1 text-xs text-emerald-600">1. Chỉ định giường</label>
+                        <select id="editBed" class="w-full px-3 py-2 border rounded-lg font-medium">
+                            <option value="auto">🤖 Tự động AI</option>
+                            <option value="1">Giường 1 (T2)</option><option value="2">Giường 2 (T2)</option>
+                            <option value="3">Giường 3 (T2)</option><option value="4">Giường 4 (T2)</option>
+                            <option value="5">Giường 5 (Lấy mẫu)</option><option value="6">Giường 6 (BS Hải)</option>
+                            <option value="7">Giường 7 (Da liễu)</option><option value="8">Giường 8 (Da liễu)</option><option value="9">Giường 9 (Da liễu)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1 text-xs text-emerald-600">2. Chỉ định giờ</label>
+                        <div class="flex gap-1 items-center mt-2 mb-1 text-xs"><input type="checkbox" id="editTimeToggle" onchange="toggleTimeInput(this)"><label>Ghi đè giờ</label></div>
+                        <input id="editStartTime" type="time" class="w-full px-3 py-1 border rounded-lg hidden">
+                    </div>
+                </div>
+                <div><label class="block font-semibold mb-1 text-xs text-emerald-600">3. Số phút nằm giường</label><input id="editDur" type="number" class="w-full px-3 py-2 border rounded-lg"></div>
+            </div>
+            <div class="bg-slate-50 p-4 border-t flex justify-between">
+                <button onclick="resetManual()" class="text-rose-600 text-xs font-bold px-3 py-2 bg-rose-50 rounded-lg">Xóa đè</button>
+                <div class="flex gap-2">
+                    <button onclick="closeEdit()" class="px-4 py-2 text-sm font-semibold rounded-lg bg-white border">Hủy</button>
+                    <button onclick="saveEdit()" class="px-4 py-2 text-sm font-bold text-white bg-slate-900 rounded-lg">Lưu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js?r=16"></script>
+    <script>
+    // --- WebSocket Connection ---
+    let ws = null;
+    const wsIndicator = document.getElementById('wsIndicator');
+    const wsStatusText = document.getElementById('wsStatusText');
+
+    function connectWS() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}`);
+        ws.onopen = () => {
+            wsIndicator.className = 'ws-status ws-connected';
+            wsStatusText.textContent = 'Đồng bộ realtime';
+            wsStatusText.className = 'text-emerald-600 font-semibold';
+        };
+        ws.onclose = () => {
+            wsIndicator.className = 'ws-status ws-disconnected';
+            wsStatusText.textContent = 'Mất kết nối, đang thử lại...';
+            wsStatusText.className = 'text-rose-600 font-semibold';
+            setTimeout(connectWS, 3000);
+        };
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'state') {
+                window.__state = data.state;
+                try { updateDateFilter(data.state); } catch(ex) { console.error('updateDateFilter:', ex); }
+                try { renderAll(data.state, false); } catch(ex) { console.error('renderAll:', ex); }
+                try { renderCustomerTable(); } catch(ex) { console.error('renderCustomerTable:', ex); }
+                try { renderRules(); } catch(ex) { console.error('renderRules:', ex); }
+                const btn = document.getElementById('undoBtn');
+                if (btn) btn.disabled = !(data.state.undoCount > 0);
+            }
+        };
+    }
+    // Note: connectWS() is called inside DOMContentLoaded below
+
+    // --- API helpers ---
+    async function api(path, opts) {
+        const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+        const j = await r.json();
+        // Enable undo button after any mutation (POST/PUT/DELETE)
+        if (opts?.method && opts.method !== 'GET') {
+            const btn = document.getElementById('undoBtn');
+            if (btn) btn.disabled = false;
+        }
+        return j;
+    }
+
+    // --- Actions ---
+    function msg(type, text) {
+        const b = document.getElementById('syncFeedback');
+        b.className = `p-3 rounded-xl border mt-3 text-sm flex gap-2 ${type==='err'?'bg-rose-50 text-rose-600':'bg-emerald-50 text-emerald-600'}`;
+        b.innerHTML = `<i class="fa-solid fa-circle-${type==='err'?'exclamation':'check'} mt-0.5"></i> <span>${text}</span>`;
+        b.classList.remove('hidden');
+        setTimeout(() => b.classList.add('hidden'), 5000);
+    }
+
+    let weekOffset = 0;
+    const DAY_NAMES = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    function getWeekDays(offset) {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayStr = fmtDate(today);
+        // Find Monday of current week (local)
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + offset * 7);
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            const ds = fmtDate(d);
+            days.push({
+                date: ds,
+                dayName: DAY_NAMES[i],
+                dayNum: d.getDate(),
+                isToday: ds === todayStr,
+                isSelected: false
+            });
+        }
+        return days;
+    }
+
+    function renderWeek(state) {
+        const days = getWeekDays(weekOffset);
+        const datesInData = new Set((state?.custs || []).map(c => c.date || state?.curDate));
+        const selDate = state?.curDate || todayVi();
+
+        // Week label
+        const first = days[0], last = days[6];
+        document.getElementById('weekLabel').textContent = `${dFmt(first.date)} - ${dFmt(last.date)}`;
+
+        // Day buttons
+        const container = document.getElementById('weekDays');
+        container.innerHTML = days.map(d => {
+            const hasData = datesInData.has(d.date);
+            const isSel = d.date === selDate;
+            let cl = 'rounded-xl p-2 cursor-pointer transition-all text-xs border ';
+            if (isSel) cl += 'bg-emerald-500 text-white border-emerald-500 shadow-md scale-105 font-bold';
+            else if (d.isToday) cl += 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold hover:bg-emerald-100';
+            else if (hasData) cl += 'bg-slate-100 text-slate-800 border-slate-200 font-medium hover:bg-slate-200';
+            else cl += 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50';
+            if (hasData && !isSel) cl += ' relative';
+            const dot = hasData && !isSel ? '<span class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-400 rounded-full"></span>' : '';
+            return `<div onclick="changeDate('${d.date}')" class="${cl} relative">
+                <div class="text-[10px] font-medium">${d.dayName}</div>
+                <div class="text-sm font-bold">${d.dayNum}</div>
+                ${dot}
+            </div>`;
+        }).join('');
+    }
+
+    function weekNav(dir) {
+        if (dir === 0) weekOffset = 0;
+        else weekOffset += dir;
+        renderWeek(window.__state);
+    }
+
+    function updateDateFilter(state) {
+        renderWeek(state);
+        const sel = document.getElementById('dateFilterSelect');
+        const dates = [...new Set(state.custs.map(c => c.date || state.curDate))].sort();
+        const cd = state.curDate || todayVi();
+        sel.innerHTML = dates.map(d => `<option value="${d}" ${d===cd?'selected':''}>${dFmt(d)}</option>`).join('');
+    }
+
+    // --- Exposed globals ---
+    window.__state = null;
+
+    window.resetData = async function() {
+        await api('/api/reset', { method: 'POST' });
+        msg('ok', 'Đã khôi phục dữ liệu mẫu!');
+    };
+
+    window.undoLastChange = async function() {
+        const btn = document.getElementById('undoBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang undo...';
+        const r = await api('/api/undo', { method: 'POST' });
+        if (r.error) { msg('err', r.error); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left"></i> Undo'; return; }
+        btn.innerHTML = '<i class="fa-solid fa-arrow-rotate-left"></i> Undo';
+        btn.disabled = !r.remaining;
+        msg('ok', 'Đã hoàn tác!');
+    };
+
+    window.toggleWaitTime = async function() {
+        const val = document.getElementById('toggleIncludeWaitTime').checked;
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify({ incWait: val }) });
+    };
+
+    window.changeDate = async function(d) {
+        // Optimistic UI update
+        if (window.__state) {
+            window.__state.curDate = d;
+            renderWeek(window.__state);
+            renderAll(window.__state, false);
+        }
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify({ curDate: d }) });
+    };
+
+    window.testRule = function(v) {
+        const r = document.getElementById('ruleTesterResult');
+        if(!v.trim()) { r.classList.add('hidden'); return; }
+        const c = getConf(v);
+        r.innerHTML = `<b class="text-emerald-700">=> ${c.n}</b><br><span class="text-slate-600">Ủ thuốc: ${c.w}p | Truyền: ${c.e}p | Giường: ${c.r?'Bắt buộc T2':'Linh hoạt'}</span>`;
+        r.classList.remove('hidden');
+    };
+
+    // --- Rules Manager ---
+    window.renderRules = function() {
+        var rules = window.__state?.rules;
+        if (!rules) return;
+        var html = '';
+        for (var i = 0; i < rules.length; i++) {
+            var r = rules[i];
+            var isDef = !r.keyword;
+            var delBtn = isDef ? '' : '<button onclick="deleteRule(\'' + r.id + '\')" class="text-rose-400 hover:text-rose-600 p-1" title="Xóa"><i class="fa-solid fa-trash"></i></button>';
+            html += '<div class="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-100 flex-wrap">'
+                + '<span class="font-bold text-slate-700 w-16 truncate">' + (r.keyword || '(mặc định)') + '</span>'
+                + '<span class="text-slate-500 w-24 truncate">' + r.label + '</span>'
+                + '<span class="text-slate-600"><b>' + r.wait + '</b>p chờ · <b>' + r.exec + '</b>p truyền</span>'
+                + '<span class="text-[10px] ' + (r.requireT2 ? 'bg-violet-100 text-violet-700' : 'bg-slate-200 text-slate-500') + ' px-1.5 py-0.5 rounded font-bold">' + (r.requireT2 ? 'Cần T2' : 'LK') + '</span>'
+                + '<span class="text-slate-400 text-[10px]">ưu tiên ' + (r.priority || 999) + '</span>'
+                + '<div class="ml-auto flex">'
+                + '<button onclick="editRule(\'' + r.id + '\')" class="text-slate-400 hover:text-emerald-600 p-1" title="Sửa"><i class="fa-solid fa-pen-to-square"></i></button>'
+                + delBtn
+                + '</div></div>';
+        }
+        document.getElementById('rulesTable').innerHTML = html;
+    };
+
+    window.addRule = async function() {
+        var kw = document.getElementById('ruleKeyword').value.trim().toUpperCase();
+        if (!kw) { msg('err', 'Cần nhập từ khóa!'); return; }
+        var editId = document.getElementById('editRuleId').value;
+        var body = {
+            keyword: kw,
+            label: document.getElementById('ruleLabel').value.trim() || kw,
+            wait: parseInt(document.getElementById('ruleWait').value) || 10,
+            exec: parseInt(document.getElementById('ruleExec').value) || 60,
+            requireT2: document.getElementById('ruleT2').checked,
+            priority: parseInt(document.getElementById('rulePriority').value) || 99
+        };
+        if (editId) {
+            await api('/api/rules/' + editId, { method: 'PUT', body: JSON.stringify(body) });
+            msg('ok', 'Đã cập nhật quy tắc!');
+        } else {
+            await api('/api/rules', { method: 'POST', body: JSON.stringify(body) });
+            msg('ok', 'Đã thêm quy tắc!');
+        }
+        clearRuleForm();
+    };
+
+    window.clearRuleForm = function() {
+        document.getElementById('ruleKeyword').value = '';
+        document.getElementById('ruleLabel').value = '';
+        document.getElementById('ruleWait').value = '';
+        document.getElementById('ruleExec').value = '';
+        document.getElementById('ruleT2').checked = false;
+        document.getElementById('rulePriority').value = '';
+        document.getElementById('editRuleId').value = '';
+        document.getElementById('cancelRuleBtn').classList.add('hidden');
+    };
+
+    window.deleteRule = async function(id) {
+        await api('/api/rules/' + id, { method: 'DELETE' });
+        msg('ok', 'Đã xóa quy tắc!');
+    };
+
+    window.editRule = function(id) {
+        var rules = window.__state?.rules;
+        if (!rules) return;
+        var r = rules.find(function(x) { return x.id === id; });
+        if (!r) return;
+        document.getElementById('ruleKeyword').value = r.keyword;
+        document.getElementById('ruleLabel').value = r.label || '';
+        document.getElementById('ruleWait').value = r.wait;
+        document.getElementById('ruleExec').value = r.exec;
+        document.getElementById('ruleT2').checked = r.requireT2;
+        document.getElementById('rulePriority').value = r.priority || '';
+        document.getElementById('editRuleId').value = r.id;
+        document.getElementById('cancelRuleBtn').classList.remove('hidden');
+    };
+
+    window.changeRoomMode = async function(id, val) {
+        if (window.__state) {
+            const c = window.__state.custs.find(x => x.id === id);
+            if (c) c.rm = val;
+            // Optimistic re-render
+            renderAll(window.__state, false);
+        }
+        await api(`/api/customer/${id}`, { method: 'PUT', body: JSON.stringify({ rm: val }) });
+    };
+
+    window.changePriority = async function(id, val) {
+        if (window.__state) {
+            const c = window.__state.custs.find(x => x.id === id);
+            if (c) c.pri = parseInt(val);
+            renderAll(window.__state, false);
+        }
+        await api(`/api/customer/${id}`, { method: 'PUT', body: JSON.stringify({ pri: parseInt(val) }) });
+    };
+
+    window.changeBed = async function(id, val) {
+        if (val === 'auto') {
+            await api(`/api/customer/${id}`, { method: 'PUT', body: JSON.stringify({ mBed: 'auto', mTime: '', mDur: null }) });
+        } else {
+            const cust = window.__state?.custs.find(x => x.id === id);
+            if (!cust) return;
+            const cfg = getConf(cust.prod);
+            const incWait = window.__state?.incWait ?? true;
+            const dur = incWait ? cfg.w + cfg.e : cfg.e;
+            await api(`/api/customer/${id}`, { method: 'PUT', body: JSON.stringify({ mBed: parseInt(val), mTime: cust.arr, mDur: dur }) });
+        }
+    };
+
+    window.dropCallback = async function(id, bedId, newTime, dur) {
+        await api(`/api/customer/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ mBed: bedId, mTime: newTime, mDur: dur })
+        });
+    };
+
+    window.removeCust = async function(id) {
+        await api(`/api/customer/${id}`, { method: 'DELETE' });
+    };
+
+    window.updateArrival = async function(id, val) {
+        await api('/api/customer/' + id, { method: 'PUT', body: JSON.stringify({ arr: val }) });
+    };
+
+    window.addCustomer = async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('custName').value;
+        var vl = detectVIPLevel(name);
+        await api('/api/customer', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name,
+                date: document.getElementById('custDate').value,
+                arr: document.getElementById('custArrivalTime').value,
+                prod: document.getElementById('custProduct').value,
+                pri: vl ? 3 : parseInt(document.getElementById('custPriority').value),
+                rm: document.getElementById('custVipRoomMode').value,
+                gender: detectGender(name),
+                vipLevel: vl,
+                mBed: "auto", mTime: "", mDur: null
+            })
+        });
+        msg('ok', 'Đã thêm khách hàng!');
+    };
+
+    window.syncFromSheetLink = async function() {
+        const btn = document.getElementById('syncLinkBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+        try {
+            const r = await api('/api/fetch-sheet', { method: 'POST' });
+            if (r.error) { msg('err', r.error); return; }
+            msg('ok', `Đã đồng bộ ${r.count} khách hàng từ Google Sheet!`);
+        } catch(e) {
+            msg('err', 'Lỗi kết nối: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Lấy dữ liệu từ Sheet';
+        }
+    };
+
+    window.parsePastedData = async function() {
+        const t = document.getElementById('pasteDataArea').value;
+        if(!t) { msg('err', 'Chưa có dữ liệu dán!'); return; }
+        const lines = t.split('\n').filter(l => l.trim());
+        const rows = [];
+        for(let i=1; i<lines.length; i++) {
+            const cols = lines[i].split('\t');
+            if(cols.length < 3) continue;
+            const name = cols[1]?.trim() || '';
+            var vl = detectVIPLevel(name);
+            rows.push({
+                name: name,
+                date: window.__state?.curDate || todayVi(),
+                arr: cols[2]?.trim() || '08:00',
+                prod: cols[3]?.trim() || '',
+                pri: vl ? 3 : 1, rm: 'none',
+                gender: detectGender(name),
+                vipLevel: vl
+            });
+        }
+        if(!rows.length) { msg('err', 'Không tìm thấy dữ liệu hợp lệ!'); return; }
+        await api('/api/sync-sheet', { method: 'POST', body: JSON.stringify({ rows }) });
+        msg('ok', `Đã đồng bộ ${rows.length} khách hàng từ bảng!`);
+    };
+
+    // --- Edit Modal ---
+    window.openEdit = function(id) {
+        const c = window.__state?.custs.find(x => x.id === id);
+        if(!c) return;
+        document.getElementById('editId').value = c.id;
+        document.getElementById('editName').value = c.name;
+        document.getElementById('editBed').value = c.mBed || 'auto';
+        document.getElementById('editTimeToggle').checked = !!c.mTime;
+        document.getElementById('editStartTime').classList.toggle('hidden', !c.mTime);
+        document.getElementById('editStartTime').value = c.mTime || c.arr;
+        const cfg = getConf(c.prod);
+        const incWait = window.__state?.incWait ?? true;
+        document.getElementById('editDur').value = c.mDur ? c.mDur : (incWait ? cfg.w+cfg.e : cfg.e);
+        document.getElementById('editModal').classList.remove('hidden');
+    };
+
+    window.closeEdit = function() { document.getElementById('editModal').classList.add('hidden'); };
+    window.toggleTimeInput = function(cb) { document.getElementById('editStartTime').classList.toggle('hidden', !cb.checked); };
+
+    window.saveEdit = async function() {
+        const id = document.getElementById('editId').value;
+        await api(`/api/customer/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                mBed: document.getElementById('editBed').value,
+                mTime: document.getElementById('editTimeToggle').checked ? document.getElementById('editStartTime').value : "",
+                mDur: parseInt(document.getElementById('editDur').value)
+            })
+        });
+        closeEdit();
+        msg('ok', 'Đã lưu chỉnh sửa!');
+    };
+
+    window.resetManual = async function() {
+        const id = document.getElementById('editId').value;
+        await api(`/api/customer/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ mBed: "auto", mTime: "", mDur: null })
+        });
+        closeEdit();
+        msg('ok', 'Đã trả về cho AI tự xếp!');
+    };
+
+    // --- Standalone Customer Table (no dependencies) ---
+    window.renderCustomerTable = function() {
+        var st = window.__state;
+        if (!st) { console.log('rCT: no state'); return; }
+        var tbd = document.getElementById('patientTableBody');
+        if (!tbd) { console.log('rCT: no tbody'); return; }
+        var cd = st.curDate;
+        var dayCusts = [];
+        for (var i = 0; i < st.custs.length; i++) {
+            var c = st.custs[i];
+            if ((c.date || cd) === cd) dayCusts.push(c);
+        }
+        // Get schedule for today
+        var schedRes = [];
+        try {
+            var sk = calcSched(st.custs, st.bedDefs, cd, st.incWait);
+            schedRes = sk.res || [];
+        } catch(e) { console.log('rCT calcSched err:', e); }
+
+        // Compute group numbering for today's customers
+        var grps = {};
+        for (var i = 0; i < dayCusts.length; i++) {
+            var g = dayCusts[i].grp;
+            if (g) grps[g] = (grps[g] || 0) + 1;
+        }
+        var grpKeys = Object.keys(grps).sort();
+        var grpIdx = {};
+        for (var i = 0; i < grpKeys.length; i++) grpIdx[grpKeys[i]] = i + 1;
+
+        var GROUP_COLORS = [
+            ['bg-indigo-100 border-indigo-200 text-indigo-800', 'bg-indigo-200 text-indigo-700 ring-1 ring-indigo-400'],
+            ['bg-teal-100 border-teal-200 text-teal-800', 'bg-teal-200 text-teal-700 ring-1 ring-teal-400'],
+            ['bg-pink-100 border-pink-200 text-pink-800', 'bg-pink-200 text-pink-700 ring-1 ring-pink-400'],
+            ['bg-amber-100 border-amber-200 text-amber-800', 'bg-amber-200 text-amber-700 ring-1 ring-amber-400'],
+            ['bg-cyan-100 border-cyan-200 text-cyan-800', 'bg-cyan-200 text-cyan-700 ring-1 ring-cyan-400'],
+            ['bg-rose-100 border-rose-200 text-rose-800', 'bg-rose-200 text-rose-700 ring-1 ring-rose-400'],
+            ['bg-lime-100 border-lime-200 text-lime-800', 'bg-lime-200 text-lime-700 ring-1 ring-lime-400'],
+            ['bg-violet-100 border-violet-200 text-violet-800', 'bg-violet-200 text-violet-700 ring-1 ring-violet-400']
+        ];
+
+        // Build rows
+        var html = '';
+        var checkedIds = getCheckedIds();
+        for (var i = 0; i < dayCusts.length; i++) {
+            var c = dayCusts[i];
+            var checked = checkedIds.indexOf(c.id) >= 0;
+            // Find schedule for this customer
+            var s = null;
+            for (var j = 0; j < schedRes.length; j++) {
+                if (schedRes[j].id === c.id) { s = schedRes[j]; break; }
+            }
+            var ok = !!s;
+            var trCl = ok ? '' : ' bg-amber-50/30';
+
+            // Group row color
+            var grpColor = null;
+            if (c.grp && grpIdx[c.grp]) {
+                var gi = (grpIdx[c.grp] - 1) % GROUP_COLORS.length;
+                grpColor = GROUP_COLORS[gi];
+                trCl += ' ' + grpColor[0];
+            }
+
+            // Checkbox HTML
+            var chkHtml = '<input type="checkbox" class="cust-check rounded" data-id="' + c.id + '" onchange="updateGroupButtons()"';
+            if (checked) chkHtml += ' checked';
+            chkHtml += '>';
+
+            // Gender icon
+            var gIcon = '<i class="fa-solid fa-genderless text-slate-400"></i>';
+            if (c.gender === 'M') gIcon = '<i class="fa-solid fa-mars text-blue-400"></i>';
+            else if (c.gender === 'F') gIcon = '<i class="fa-solid fa-venus text-pink-400"></i>';
+
+            // Group badge
+            var grpBadge = '';
+            if (c.grp && grpIdx[c.grp]) {
+                var gi2 = (grpIdx[c.grp] - 1) % GROUP_COLORS.length;
+                var badgeCl = GROUP_COLORS[gi2][1];
+                grpBadge = '<span class="inline-block ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ' + badgeCl + '">Nhom ' + grpIdx[c.grp] + '</span>';
+            }
+
+            // Priority badge
+            var pBadge = '<span class="text-slate-500 text-[10px]">Thuong</span>';
+            if (c.vipLevel === 'VV') pBadge = '<span class="bg-gradient-to-r from-amber-100 to-orange-200 text-orange-800 px-2 py-0.5 rounded font-bold text-[10px] ring-1 ring-orange-300"><i class="fa-solid fa-crown text-orange-500"></i><i class="fa-solid fa-crown text-orange-500"></i> VVIP</span>';
+            else if (c.vipLevel === 'V') pBadge = '<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-bold text-[10px]"><i class="fa-solid fa-crown text-amber-500"></i> VIP</span>';
+            else if (c.pri == 3) pBadge = '<span class="bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-bold text-[10px]">VIP</span>';
+            else if (c.pri == 2) pBadge = '<span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px]">Than thiet</span>';
+
+            // Status
+            var sHtml = '<span class="text-slate-400 font-bold text-[10px]"><i class="fa-solid fa-circle-exclamation"></i> Chua xep</span>';
+            if (ok && s.wait > 0) sHtml = '<span class="text-amber-600 font-bold text-[10px]"><i class="fa-solid fa-hourglass"></i> Cho ' + s.wait + 'p</span>';
+            else if (ok) sHtml = '<span class="text-emerald-600 font-bold text-[10px]"><i class="fa-solid fa-check"></i> OK</span>';
+
+            // Bed info
+            var bHtml = '<span class="text-slate-400 italic text-[11px]">Chua xac dinh</span>';
+            if (ok) {
+                var mB = s.man ? '<span class="bg-emerald-100 text-emerald-800 px-1 rounded font-bold text-[10px]">\u270d\ufe0f</span>' : '';
+                bHtml = '<span class="font-bold text-slate-800 text-[11px]">' + s.bRm + ' (' + s.bName + ')</span> ' + mB
+                    + '<div class="text-[9px] text-slate-500">' + s.sTime + ' - ' + s.eTime + ' (' + s.dur + 'p)</div>';
+            }
+
+            // Room mode dropdown
+            var modeCl = c.rm === 'single' ? ' border-rose-300 bg-rose-50' : '';
+            var noneSl = c.rm === 'none' ? ' selected' : '';
+            var singSl = c.rm === 'single' ? ' selected' : '';
+
+            html += '<tr class="hover:bg-slate-50 border-b border-slate-100' + trCl + '">'
+                + '<td class="p-3 text-center">' + chkHtml + '</td>'
+                + '<td class="p-3">'
+                + '<div class="font-bold text-slate-800 text-[12px] flex items-center gap-1 flex-wrap">' + gIcon + ' ' + c.name + grpBadge + '</div>'
+                + '<div class="flex flex-wrap gap-1 mt-1">'
+                + '<select onchange="changeRoomMode(\'' + c.id + '\',this.value)" class="text-[10px] p-0.5 border rounded bg-white text-slate-600' + modeCl + '">'
+                + '<option value="none"' + noneSl + '>Ghep phong</option>'
+                + '<option value="single"' + singSl + '>1 minh 1 phong</option>'
+                + '</select>'
+                + '</div>'
+                + '</td>'
+                + '<td class="p-3">' + pBadge + '</td>'
+                + '<td class="p-3 font-semibold text-[11px]">' + c.prod.split('\n')[0] + '</td>'
+                + '<td class="p-3 font-medium text-slate-600 text-[11px]"><input type="time" value="' + c.arr + '" onchange="updateArrival(\'' + c.id + '\',this.value)" class="w-20 px-1 py-0.5 border border-slate-200 rounded bg-white text-slate-700 text-[11px] font-medium focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none"></td>'
+                + '<td class="p-3">' + bHtml + '</td>'
+                + '<td class="p-3">' + sHtml + '</td>'
+                + '<td class="p-3 text-center">'
+                + '<button onclick="openEdit(\'' + c.id + '\')" class="text-slate-400 hover:text-emerald-600 p-1" title="Sua"><i class="fa-solid fa-pen-to-square"></i></button>'
+                + '<button onclick="removeCust(\'' + c.id + '\')" class="text-slate-400 hover:text-rose-600 p-1" title="Xoa"><i class="fa-solid fa-trash"></i></button>'
+                + '</td>'
+                + '</tr>';
+        }
+
+        tbd.innerHTML = html;
+        var cnt = document.getElementById('custTableCount');
+        if (cnt) cnt.textContent = dayCusts.length + ' khach (' + schedRes.length + ' da xep)';
+        document.getElementById('checkAll').checked = false;
+        updateGroupButtons();
+    };
+
+    // --- Group helpers ---
+    function getCheckedIds() {
+        var ids = [];
+        var cbs = document.querySelectorAll('.cust-check:checked');
+        for (var i = 0; i < cbs.length; i++) ids.push(cbs[i].getAttribute('data-id'));
+        return ids;
+    }
+
+    window.updateGroupButtons = function() {
+        var ids = getCheckedIds();
+        document.getElementById('groupBtn').disabled = ids.length < 2;
+        var hasGroup = false;
+        var st = window.__state;
+        if (st) {
+            for (var i = 0; i < ids.length; i++) {
+                var c = st.custs.find(function(x) { return x.id === ids[i]; });
+                if (c && c.grp) { hasGroup = true; break; }
+            }
+        }
+        document.getElementById('ungroupBtn').disabled = !hasGroup;
+    };
+
+    window.toggleAllChecks = function(checked) {
+        var cbs = document.querySelectorAll('.cust-check');
+        for (var i = 0; i < cbs.length; i++) cbs[i].checked = checked;
+        updateGroupButtons();
+    };
+
+    window.groupSelected = async function() {
+        var ids = getCheckedIds();
+        if (ids.length < 2) return;
+        var grpId = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        for (var i = 0; i < ids.length; i++) {
+            await api('/api/customer/' + ids[i], { method: 'PUT', body: JSON.stringify({ grp: grpId }) });
+        }
+        msg('ok', 'Da ghep ' + ids.length + ' khach chung nhom!');
+    };
+
+    window.ungroupSelected = async function() {
+        var ids = getCheckedIds();
+        if (!ids.length) return;
+        for (var i = 0; i < ids.length; i++) {
+            await api('/api/customer/' + ids[i], { method: 'PUT', body: JSON.stringify({ grp: null }) });
+        }
+        msg('ok', 'Da ra nhom ' + ids.length + ' khach!');
+    };
+
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('custDate').value = todayVi();
+        document.getElementById('bgGridLines').innerHTML = Array(10).fill('<div class="border-l border-dashed border-slate-200 h-full"></div>').join('');
+        // Always set date to today on page load
+        api('/api/settings', { method: 'PUT', body: JSON.stringify({ curDate: todayVi() }) });
+        // Fallback fetch if WebSocket hasn't delivered state yet
+        fetch('/api/state').then(r => r.json()).then(state => {
+            if (!window.__state) {
+                state.curDate = todayVi();
+                window.__state = state;
+                try { updateDateFilter(state); } catch(e) { console.error('init updateDateFilter:', e); }
+                try { renderAll(state, false); } catch(e) { console.error('init renderAll:', e); }
+                try { renderCustomerTable(); } catch(e) { console.error('init renderCustomerTable:', e); }
+                try { renderRules(); } catch(e) { console.error('init renderRules:', e); }
+                const btn = document.getElementById('undoBtn');
+                if (btn) btn.disabled = !(state.undoCount > 0);
+            }
+        })        .catch(e => console.error('init fetch:', e));
+        // Then connect WebSocket for realtime updates
+        connectWS();
+        // Util stat update
+        setInterval(() => {
+            if(window.__state) {
+                const sched = calcSched(window.__state.custs, window.__state.bedDefs, window.__state.curDate, window.__state.incWait);
+                const util = Math.min(100, Math.round((sched.beds.reduce((a,b)=>a+b.tot,0)/(600*9))*100));
+                document.getElementById('statUtilization').textContent = `${util}%`;
+            }
+        }, 5000);
+    });
+    </script>
+</body>
+</html>

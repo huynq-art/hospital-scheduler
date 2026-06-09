@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: hospital-scheduler
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/state
+    envVars:
+      - key: NODE_VERSION
+        value: 18

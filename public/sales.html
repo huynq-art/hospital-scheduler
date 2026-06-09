@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales View - Sơ Đồ Lịch Truyền</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .bg-striped-blocked { background-color: #1e293b; background-image: repeating-linear-gradient(45deg, #334155, #334155 10px, #1e293b 10px, #1e293b 20px); }
+        .ws-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .ws-connected { background: #22c55e; }
+        .ws-disconnected { background: #ef4444; }
+        .time-now { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 20; transition: left 1s linear; }
+        .time-now::after { content: ''; position: absolute; top: -4px; left: -4px; width: 10px; height: 10px; background: #ef4444; border-radius: 50%; }
+        .live-badge { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-600 text-white p-2 rounded-xl shadow-md">
+                    <i class="fa-solid fa-bed-pulse text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white">Sơ Đồ Lịch Truyền</h1>
+                    <p class="text-[10px] text-slate-400 flex items-center gap-2">
+                        <span class="ws-status ws-connected" id="wsIndicator"></span>
+                        <span id="wsStatusText" class="text-emerald-400 font-semibold">Trực tiếp</span>
+                        <span class="live-badge text-rose-400 font-bold ml-2"><i class="fa-solid fa-circle"></i> LIVE</span>
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-slate-400">
+                <span><i class="fa-regular fa-calendar"></i> <span id="currentDateLabel">...</span></span>
+                <span><i class="fa-regular fa-clock"></i> <span id="currentTimeLabel">...</span></span>
+                <div class="bg-slate-800 px-2 py-1 rounded-lg text-slate-300 font-semibold">
+                    <i class="fa-solid fa-users mr-1"></i><span id="totalPatients">0</span>
+                </div>
+                <button onclick="manualRefresh()" class="px-3 py-1 bg-emerald-700 hover:bg-emerald-600 text-white text-xs rounded-lg font-semibold transition-colors">
+                    <i class="fa-solid fa-rotate mr-1"></i>Cập nhật
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+
+        <!-- WEEK DATE PICKER -->
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 mb-6 shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="p-2 bg-emerald-900/30 text-emerald-400 rounded-xl"><i class="fa-regular fa-calendar-check"></i></div>
+                    <h4 class="font-bold text-sm text-white">Chọn Ngày</h4>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="salesWeekNav(-1)" class="p-2 rounded-lg hover:bg-slate-800 text-slate-400" title="Tuần trước"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="salesWeekLabel" class="text-xs font-semibold text-slate-400 min-w-[140px] text-center"></span>
+                    <button onclick="salesWeekNav(1)" class="p-2 rounded-lg hover:bg-slate-800 text-slate-400" title="Tuần sau"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button onclick="salesWeekNav(0)" class="ml-1 text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold">Hôm nay</button>
+                </div>
+            </div>
+            <div id="salesWeekDays" class="grid grid-cols-7 gap-1.5 text-center"></div>
+        </div>
+
+        <!-- STATS -->
+        <div class="grid grid-cols-4 gap-3 mb-6">
+            <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-blue-900/50 text-blue-400"><i class="fa-solid fa-users"></i></div>
+                <div><p class="text-[10px] font-medium text-slate-500">Tổng khách</p><p id="salesTotalCust" class="text-lg font-bold text-white">0</p></div>
+            </div>
+            <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-amber-900/50 text-amber-400"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                <div><p class="text-[10px] font-medium text-slate-500">Chờ TB</p><p id="salesAvgWait" class="text-lg font-bold text-white">0p</p></div>
+            </div>
+            <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-emerald-900/50 text-emerald-400"><i class="fa-solid fa-percent"></i></div>
+                <div><p class="text-[10px] font-medium text-slate-500">Hiệu suất</p><p id="salesUtilization" class="text-lg font-bold text-white">0%</p></div>
+            </div>
+            <div class="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-rose-900/50 text-rose-400"><i class="fa-solid fa-hourglass-start"></i></div>
+                <div><p class="text-[10px] font-medium text-slate-500">Trễ</p><p id="salesDelayed" class="text-lg font-bold text-white">0</p></div>
+            </div>
+        </div>
+
+        <!-- GANTT CHART -->
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+            <div class="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="font-semibold text-white flex items-center gap-2 text-sm">
+                    <i class="fa-solid fa-chart-gantt text-emerald-400"></i> Biểu Đồ Gantt <span class="text-slate-400 font-normal text-xs ml-2">(Tự động cập nhật realtime)</span>
+                </h3>
+                <div class="flex gap-3 text-[10px] font-medium">
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-violet-400/30 border border-violet-400"></span> VIP</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded border border-dashed border-emerald-400"></span> Chỉnh tay</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-400/30 border border-amber-400"></span> Chờ</span>
+                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-slate-700 border border-slate-600"></span> Khóa</span>
+                </div>
+            </div>
+            <div class="p-4 overflow-x-auto custom-scrollbar">
+                <div class="min-w-[1200px] relative pb-4" id="ganttContainer">
+                    <div class="grid grid-cols-11 border-b border-slate-800 pb-2 mb-4 text-xs font-semibold text-slate-500 text-center">
+                        <div class="col-span-1 text-left pl-2">GIƯỜNG</div>
+                        <div class="col-span-10 grid grid-cols-10 text-center">
+                            <div>08:00</div><div>09:00</div><div>10:00</div><div>11:00</div><div>12:00</div><div>13:00</div><div>14:00</div><div>15:00</div><div>16:00</div><div>17:00</div>
+                        </div>
+                    </div>
+                    <div class="space-y-4 relative">
+                        <div id="salesBgGridLines" class="absolute inset-y-0 left-[9.09%] right-0 grid grid-cols-10 pointer-events-none z-0"></div>
+                        <div id="salesBedLanes" class="space-y-3 relative z-10"></div>
+                        <div id="timeNowIndicator" class="absolute top-0 bottom-0 z-20 pointer-events-none" style="left:0%; display:none;">
+                            <div class="h-full" style="width:2px; background:#ef4444; position:relative;">
+                                <div style="position:absolute;top:-4px;left:-4px;width:10px;height:10px;background:#ef4444;border-radius:50%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEGEND & INFO -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                <h4 class="font-bold text-emerald-400 text-xs mb-3"><i class="fa-solid fa-circle-info"></i> Chú thích màu sắc</h4>
+                <div class="space-y-2 text-xs text-slate-400">
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-emerald-400/30 border border-emerald-400"></span> Đúng giờ, không chờ</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-amber-400/30 border border-amber-400"></span> Có thời gian chờ</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-rose-400/30 border border-rose-400"></span> Dịch vụ bắt buộc giường T2</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-violet-400/30 border border-violet-400"></span> Khách VIP</div>
+                </div>
+            </div>
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                <h4 class="font-bold text-emerald-400 text-xs mb-3"><i class="fa-solid fa-bed"></i> Cấu hình giường</h4>
+                <div id="bedLegend" class="grid grid-cols-3 gap-2 text-xs"></div>
+            </div>
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col justify-center items-center">
+                <div class="text-4xl font-bold text-white" id="bigPatientCount">0</div>
+                <div class="text-xs text-slate-500">Bệnh nhân hôm nay</div>
+                <div class="text-[10px] text-slate-600 mt-2">Dữ liệu cập nhật realtime từ hệ thống</div>
+            </div>
+        </div>
+
+        <!-- CUSTOMER TABLE -->
+        <div class="mt-6 bg-slate-900 rounded-2xl border border-slate-800 shadow-lg overflow-hidden">
+            <div class="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="font-semibold text-white text-sm flex items-center gap-2"><i class="fa-solid fa-list-check text-emerald-400"></i> Danh Sách Khách Hàng</h3>
+                <span class="text-xs font-medium text-slate-400" id="salesCustCount">0 khách</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse whitespace-nowrap">
+                    <thead class="bg-slate-800/50 text-slate-400 text-[10px] font-bold uppercase border-b border-slate-800">
+                        <tr>
+                            <th class="p-3">Khách Hàng</th><th class="p-3">Hạng</th><th class="p-3">Dịch Vụ</th><th class="p-3">Hẹn</th>
+                            <th class="p-3">Giường</th><th class="p-3">Thực Tế</th><th class="p-3">Trạng Thái</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salesPatientTableBody" class="divide-y divide-slate-800 text-xs"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-900 border-t border-slate-800 py-3 text-center text-[10px] text-slate-600">
+        Hệ Thống Xếp Giường Truyền Tự Động &mdash; Dành cho bộ phận Sale &mdash; <span id="footerTime">--</span>
+    </footer>
+
+    <script src="/app.js?r=3"></script>
+    <script>
+    // --- WebSocket connection ---
+    let ws = null;
+    let currentState = null;
+    const wsIndicator = document.getElementById('wsIndicator');
+    const wsStatusText = document.getElementById('wsStatusText');
+
+    function connectWS() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}`);
+        ws.onopen = () => {
+            wsIndicator.className = 'ws-status ws-connected';
+            wsStatusText.textContent = 'Trực tiếp';
+            wsStatusText.className = 'text-emerald-400 font-semibold';
+        };
+        ws.onclose = () => {
+            wsIndicator.className = 'ws-status ws-disconnected';
+            wsStatusText.textContent = 'Đang kết nối lại...';
+            wsStatusText.className = 'text-rose-400 font-semibold';
+            setTimeout(connectWS, 3000);
+        };
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'state') {
+                currentState = data.state;
+                renderSalesView(data.state);
+            }
+        };
+    }
+    connectWS();
+
+    // --- Week picker ---
+    let salesWeekOff = 0;
+    const SALES_DAY_NAMES = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    function getSalesWeekDays(offset) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const todayStr = fmtDate(today);
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + offset * 7);
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday); d.setDate(monday.getDate() + i);
+            const ds = fmtDate(d);
+            days.push({
+                date: ds,
+                dayName: SALES_DAY_NAMES[i],
+                dayNum: d.getDate(),
+                isToday: ds === todayStr
+            });
+        }
+        return days;
+    }
+
+    function renderSalesWeek(state) {
+        const days = getSalesWeekDays(salesWeekOff);
+        const datesInData = new Set((state?.custs || []).map(c => c.date || state?.curDate));
+        const selDate = state?.curDate || todayVi();
+        const first = days[0], last = days[6];
+        document.getElementById('salesWeekLabel').textContent = `${dFmt(first.date)} - ${dFmt(last.date)}`;
+        document.getElementById('salesWeekDays').innerHTML = days.map(d => {
+            const hasData = datesInData.has(d.date);
+            const isSel = d.date === selDate;
+            let cl = 'rounded-xl p-2 cursor-pointer transition-all text-xs border ';
+            if (isSel) cl += 'bg-emerald-600 text-white border-emerald-500 shadow-md font-bold';
+            else if (d.isToday) cl += 'bg-emerald-900/30 text-emerald-300 border-emerald-800 font-semibold hover:bg-emerald-800/30';
+            else if (hasData) cl += 'bg-slate-800 text-slate-200 border-slate-700 font-medium hover:bg-slate-700';
+            else cl += 'bg-slate-900 text-slate-500 border-slate-800 hover:bg-slate-800';
+            const dot = hasData && !isSel ? '<span class="block mx-auto mt-0.5 w-1 h-1 bg-emerald-400 rounded-full"></span>' : '';
+            return `<div onclick="salesChangeDate('${d.date}')" class="${cl}">
+                <div class="text-[10px] font-medium">${d.dayName}</div>
+                <div class="text-sm font-bold">${d.dayNum}</div>
+                ${dot}
+            </div>`;
+        }).join('');
+    }
+
+    window.salesWeekNav = function(dir) {
+        if (dir === 0) salesWeekOff = 0;
+        else salesWeekOff += dir;
+        renderSalesWeek(currentState);
+    };
+
+    window.salesChangeDate = async function(d) {
+        if (currentState) {
+            currentState.curDate = d;
+            renderSalesWeek(currentState);
+            renderSalesView(currentState);
+        }
+        // Also tell server
+        const r = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ curDate: d })
+        });
+    };
+
+    // --- Render sales view ---
+    function renderSalesView(state) {
+        renderSalesWeek(state);
+        const sched = calcSched(state.custs, state.bedDefs, state.curDate, state.incWait);
+        const { res, beds } = sched;
+
+        // Date & Time
+        document.getElementById('currentDateLabel').textContent = dFmt(state.curDate);
+        document.getElementById('totalPatients').textContent = res.length;
+        document.getElementById('bigPatientCount').textContent = res.length;
+
+        // Stats
+        let tw = 0, td = 0;
+        res.forEach(i => { tw += i.wait; if(i.wait>0) td++; });
+        document.getElementById('salesTotalCust').textContent = res.length;
+        document.getElementById('salesAvgWait').textContent = res.length ? `${Math.round(tw/res.length)}p` : '0p';
+        document.getElementById('salesDelayed').textContent = td;
+        const util = Math.min(100, Math.round((beds.reduce((a,b)=>a+b.tot,0)/(600*9))*100));
+        document.getElementById('salesUtilization').textContent = `${util}%`;
+
+        // Grid lines
+        document.getElementById('salesBgGridLines').innerHTML = Array(10).fill('<div class="border-l border-dashed border-slate-800 h-full"></div>').join('');
+
+        // Render lanes
+        let html = '';
+        beds.forEach(b => {
+            const utilBar = Math.min(100, Math.round((b.tot/600)*100));
+            html += `
+                <div class="grid grid-cols-11 items-center relative z-10" style="min-height:72px">
+                    <div class="col-span-1 pr-2 leading-tight">
+                        <div class="font-bold text-sm text-white">${b.name}</div>
+                        <span class="text-[10px] ${b.isT2?'bg-violet-900/50 text-violet-300':'bg-slate-800 text-slate-400'} px-1.5 py-0.5 rounded font-bold">${b.room}</span>
+                        <div class="text-[9px] text-slate-500 mt-0.5">
+                            <div class="w-full h-1 bg-slate-800 rounded mt-1 overflow-hidden">
+                                <div class="h-full bg-emerald-500/50 rounded" style="width:${utilBar}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-10 relative bg-slate-800/30 border border-slate-800 rounded-xl h-[58px] w-full" id="slane-${b.id}"></div>
+                </div>`;
+        });
+        document.getElementById('salesBedLanes').innerHTML = html;
+
+        // Draw patient blocks
+        res.forEach(i => {
+            const lane = document.getElementById(`slane-${i.bId}`);
+            if(!lane) return;
+            const lPct = Math.max(0, ((i.start - 480)/600)*100);
+            const wPct = Math.min(100-lPct, (i.dur/600)*100);
+
+            let cl = i.man ? "border-dashed border-2 ring-2 ring-emerald-400/50 border-emerald-500 bg-emerald-900/30 text-emerald-200"
+                : i.v ? "bg-violet-900/30 border-violet-500/50 text-violet-200"
+                : i.cfg.r ? "bg-rose-900/30 border-rose-500/50 text-rose-200"
+                : i.wait>0 ? "bg-amber-900/30 border-amber-500/50 text-amber-200"
+                : "bg-emerald-900/20 border-emerald-500/30 text-emerald-200";
+
+            const vIc = (i.pri==3||i.v) ? '<i class="fa-solid fa-crown text-amber-400 text-[10px]"></i>' : '';
+            const mIc = i.man ? '✍️' : '';
+
+            lane.innerHTML += `
+                <div class="absolute h-[52px] top-[2px] rounded-lg border p-1.5 overflow-hidden flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
+                    <div class="font-bold text-[10px] truncate leading-tight text-white">${vIc} ${mIc} ${i.name}</div>
+                    <div class="text-[9px] truncate text-slate-400 font-semibold">${i.prod}</div>
+                    <div class="text-[9px] font-medium mt-0.5 border-t border-slate-700/50 pt-0.5 flex justify-between text-slate-400">
+                        <span>${i.sTime}-${i.eTime}</span><span class="opacity-70">${i.dur}p</span>
+                    </div>
+                </div>`;
+        });
+
+        // Draw locks
+        beds.forEach(b => {
+            b.occ.forEach(o => {
+                if(o.type==='l') {
+                    const lPct = Math.max(0, ((o.s-480)/600)*100);
+                    const wPct = Math.min(100-lPct, ((o.e-o.s)/600)*100);
+                    const lane = document.getElementById(`slane-${b.id}`);
+                    if(lane) lane.innerHTML += `
+                        <div class="absolute h-[52px] top-[2px] rounded-lg border border-dashed bg-striped-blocked flex flex-col items-center justify-center pointer-events-none" style="left:${lPct}%; width:${wPct}%">
+                            <span class="text-[9px] font-bold text-slate-500">🔒 Khóa</span>
+                        </div>`;
+                }
+            });
+        });
+
+        // Bed legend
+        document.getElementById('bedLegend').innerHTML = beds.map(b =>
+            `<div class="flex items-center gap-1 text-slate-400">
+                <span class="font-bold text-white">${b.name}</span>
+                <span class="text-[10px]">${b.room}</span>
+            </div>`
+        ).join('');
+
+        // Customer table
+        renderSalesTable(state, res);
+    }
+
+    function renderSalesTable(state, res) {
+        const tbd = document.getElementById('salesPatientTableBody');
+        if (!tbd) return;
+        const dayCusts = state.custs.filter(c => (c.date || state.curDate) === state.curDate);
+        const scheduledIds = new Set(res.map(r => r.id));
+
+        tbd.innerHTML = dayCusts.map(c => {
+            const sched = res.find(r => r.id === c.id);
+            const isScheduled = !!sched;
+            const cfg = getConf(c.prod);
+
+            const pB = c.pri == 3 ? '<span class="text-amber-400 font-bold text-[10px]">VIP</span>'
+                : c.pri == 2 ? '<span class="text-indigo-400 font-bold text-[10px]">TV</span>'
+                : '<span class="text-slate-500 text-[10px]">Thường</span>';
+
+            const genderIcon = c.gender === 'M' ? '<i class="fa-solid fa-mars text-blue-400"></i>'
+                : c.gender === 'F' ? '<i class="fa-solid fa-venus text-pink-400"></i>'
+                : '';
+
+            let sB, bedHtml, timeHtml;
+            if (isScheduled) {
+                sB = sched.wait > 0
+                    ? `<span class="text-amber-400 font-bold text-[10px]"><i class="fa-solid fa-hourglass"></i> Chờ ${sched.wait}p</span>`
+                    : `<span class="text-emerald-400 font-bold text-[10px]"><i class="fa-solid fa-check"></i> OK</span>`;
+                bedHtml = `<span class="font-bold text-white text-[11px]">${sched.bRm} (${sched.bName})</span>${sched.man ? ' <span class="text-emerald-400 text-[9px]">✍️</span>' : ''}`;
+                timeHtml = `<span class="text-white font-medium">${sched.sTime} - ${sched.eTime}</span>`;
+            } else {
+                sB = `<span class="text-slate-500 font-bold text-[10px]"><i class="fa-solid fa-circle-exclamation"></i> Chưa xếp</span>`;
+                bedHtml = `<span class="text-slate-500 italic text-[11px]">—</span>`;
+                timeHtml = `<span class="text-slate-500">—</span>`;
+            }
+
+            return `<tr class="hover:bg-slate-800/50 border-b border-slate-800 ${isScheduled?'':'bg-slate-800/20'}">
+                <td class="p-3"><span class="font-bold text-white text-[12px]">${genderIcon} ${c.name}</span></td>
+                <td class="p-3">${pB}</td>
+                <td class="p-3 font-semibold text-slate-300 text-[11px]">${c.prod.split('\n')[0]}<div class="text-[9px] text-slate-500">Ủ ${cfg.w}p + Làm ${cfg.e}p</div></td>
+                <td class="p-3 text-slate-300 text-[11px]">${c.arr}</td>
+                <td class="p-3">${bedHtml}</td>
+                <td class="p-3">${timeHtml}</td>
+                <td class="p-3">${sB}</td>
+            </tr>`;
+        }).join('');
+
+        const countEl = document.getElementById('salesCustCount');
+        if (countEl) countEl.textContent = `${dayCusts.length} khách (${res.length} đã xếp)`;
+    }
+
+    // --- Clock + Time indicator ---
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('currentTimeLabel').textContent = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('footerTime').textContent = now.toLocaleString('vi-VN');
+
+        // Move time indicator
+        const totalMin = now.getHours()*60 + now.getMinutes();
+        if (totalMin >= 480 && totalMin <= 1080) {
+            const pct = ((totalMin - 480) / 600) * 100;
+            const el = document.getElementById('timeNowIndicator');
+            el.style.left = `${pct}%`;
+            el.style.display = 'block';
+        } else {
+            document.getElementById('timeNowIndicator').style.display = 'none';
+        }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Manual refresh
+    window.manualRefresh = function() {
+        fetch('/api/state').then(r => r.json()).then(state => {
+            currentState = state;
+            renderSalesView(state);
+        }).catch(e => console.error('manualRefresh:', e));
+    };
+
+    // Initial fetch
+    fetch('/api/state').then(r => r.json()).then(state => {
+        currentState = state;
+        renderSalesView(state);
+    });
+    </script>
+</body>
+</html>
