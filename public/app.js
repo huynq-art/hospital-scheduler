@@ -198,6 +198,14 @@ function calcSched(custs, bedDefs, curDate, incWait) {
           if (sib && !sib.occ.every(o => e <= o.s || search >= o.e)) continue;
         }
         if (isRoomLocked(b.room, search, e)) continue;
+        // Gender separation: skip T2 bed if sibling has opposite gender (unless couple mode)
+        if (b.isT2 && p.rm !== 'couple') {
+          const sib = beds.find(o => o.room === b.room && o.id !== b.id);
+          if (sib) {
+            var oppG = sib.occ.some(function(o) { return o.type === 'b' && o.g && pg && o.g !== pg && o.g !== 'U' && pg !== 'U'; });
+            if (oppG) continue;
+          }
+        }
         foundBed = b; fStart = search; found = true; break;
       }
       if (!found) search += 5;
