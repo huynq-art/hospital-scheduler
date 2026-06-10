@@ -183,8 +183,8 @@ function calcSched(custs, bedDefs, curDate, incWait) {
             pa = ROOM_PRIORITY.indexOf(a.room);
             pb = ROOM_PRIORITY.indexOf(b.room);
           } else {
-            // Non-VIP: VIP 2 → non-T2 (Lấy mẫu, Da liễu, BS Hải) → VIP 1 (cuối)
-            var nonVipOrder = { 'VIP 2': 0, 'Lấy mẫu': 1, 'Da liễu': 2, 'BS Hải': 3, 'VIP 1': 4 };
+            // Non-VIP: VIP 2 → VIP 1 → Lấy mẫu → Da liễu → BS Hải
+            var nonVipOrder = { 'VIP 2': 0, 'VIP 1': 1, 'Lấy mẫu': 2, 'Da liễu': 3, 'BS Hải': 4 };
             pa = nonVipOrder[a.room] !== undefined ? nonVipOrder[a.room] : 99;
             pb = nonVipOrder[b.room] !== undefined ? nonVipOrder[b.room] : 99;
           }
