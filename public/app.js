@@ -260,14 +260,7 @@ function ganttDrop(e, bedId) {
     alert('Giường này đã có lịch vào khung giờ đó!');
     return;
   }
-  // Check service T2 requirement
   const cust = window.__state?.custs.find(c => c.id === dragData.id);
-  if (!cust) return;
-  var conf = getConf(cust.prod);
-  if (conf && conf.r && !targetBed.isT2) {
-    alert('Dịch vụ này yêu cầu giường T2!');
-    return;
-  }
   // Check room mode
   if (targetBed.isT2 && (cust.rm === 'single' || cust.rm === 'couple')) {
     const sib = beds.find(o => o.room === targetBed.room && o.id !== targetBed.id);
