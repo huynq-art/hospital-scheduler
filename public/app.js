@@ -179,13 +179,14 @@ function calcSched(custs, bedDefs, curDate, incWait) {
           }
           var pa, pb;
           if (v) {
-            // VIP: prioritize VIP 1 → VIP 2 → Lấy mẫu → Da liễu → BS Hải
+            // VIP: VIP 1 → VIP 2 → Lấy mẫu → Da liễu → BS Hải
             pa = ROOM_PRIORITY.indexOf(a.room);
             pb = ROOM_PRIORITY.indexOf(b.room);
           } else {
-            // Non-VIP: prefer non-T2 first (Da liễu, Lấy mẫu, BS Hải), then T2
-            pa = a.isT2 ? 100 + a.id : ROOM_PRIORITY.indexOf(a.room);
-            pb = b.isT2 ? 100 + b.id : ROOM_PRIORITY.indexOf(b.room);
+            // Non-VIP: VIP 2 → non-T2 (Lấy mẫu, Da liễu, BS Hải) → VIP 1 (cuối)
+            var nonVipOrder = { 'VIP 2': 0, 'Lấy mẫu': 1, 'Da liễu': 2, 'BS Hải': 3, 'VIP 1': 4 };
+            pa = nonVipOrder[a.room] !== undefined ? nonVipOrder[a.room] : 99;
+            pb = nonVipOrder[b.room] !== undefined ? nonVipOrder[b.room] : 99;
           }
           if (pa !== pb) return pa - pb;
           // Same room: prefer gender-matched sibling
