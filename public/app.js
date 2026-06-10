@@ -161,9 +161,8 @@ function calcSched(custs, bedDefs, curDate, incWait) {
     const v = isVIP(p.name, p.prod);
     const pg = genMap[p.id];
 
-    // Determine eligible beds
-    const aBeds = (p.mBed && p.mBed!=='auto') ? [+p.mBed]
-      : v ? [1,2,3,4] : bedDefs.map(b => b.id);
+    // Determine eligible beds — VIP can use all beds, sorted by room priority
+    const aBeds = (p.mBed && p.mBed!=='auto') ? [+p.mBed] : bedDefs.map(b => b.id);
 
     let foundBed = null, fStart = arrM, search = arrM, found = false;
     while(!found && search < 1440) {
