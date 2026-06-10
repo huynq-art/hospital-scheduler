@@ -238,12 +238,12 @@ function ganttDrop(e, bedId) {
     alert('Giường này đã có lịch vào khung giờ đó!');
     return;
   }
-  // Check VIP constraint
+  // Check service T2 requirement
   const cust = window.__state?.custs.find(c => c.id === dragData.id);
   if (!cust) return;
-  const v = isVIP(cust.name, cust.prod);
-  if (v && !targetBed.isT2) {
-    alert('Khách VIP chỉ được xếp vào giường T2 (VIP 1 hoặc VIP 2)!');
+  var conf = getConf(cust.prod);
+  if (conf && conf.r && !targetBed.isT2) {
+    alert('Dịch vụ này yêu cầu giường T2!');
     return;
   }
   // Check room mode
