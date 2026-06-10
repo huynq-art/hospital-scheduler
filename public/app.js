@@ -55,9 +55,8 @@ function getConf(raw) {
           return { n: r.label || r.keyword, w: r.wait || 10, e: r.exec || 60, r: r.requireT2 || false };
         }
       }
-      // Default fallback
-      var def = rules.find(function(rr) { return !rr || !rr.keyword; });
-      if (def) return { n: def.label || raw, w: def.wait || 10, e: def.exec || 60, r: def.requireT2 || false };
+      // No matching rule → unknown service
+      return { unknown: true, w: 0, e: 0, r: false };
     } catch(e) { console.error('getConf dynamic error:', e); }
   }
   // Fallback to hardcoded rules if no state or no rules
@@ -76,11 +75,12 @@ function getConf(raw) {
     if(v||h||d||ta) return { n:"Đơn thuốc BS", w:10, e:90, r:false };
     return { n:"ĐƠN THUỐC", w:10, e:75, r:false };
   }
-  return { n: raw, w: 10, e: 60, r: false };
+  return { unknown: true, w: 0, e: 0, r: false };
 }
 
 function isVIP(name, prod) {
-  if(getConf(prod).r) return true;
+  var conf = getConf(prod);
+  if (conf && conf.r) return true;
   const cn = name.trim().toLowerCase().replace(/[-–—]+\s*/g, ' ');
   return cn.endsWith(' v') || cn.endsWith(' vv') || cn.endsWith(' vip') || cn.endsWith(' vvip');
 }
@@ -155,6 +155,7 @@ function calcSched(custs, bedDefs, curDate, incWait) {
   // Pre-group by arrival time window (30min buckets) for same-room pairing
   autoList.forEach(p => {
     const cfg = getConf(p.prod);
+    if (cfg.unknown) return; // skip unrecognized services — user will set manually
     const dur = p.mDur ? +p.mDur : (incWait ? cfg.w+cfg.e : cfg.e);
     const arrM = t2M(p.arr);
     const v = isVIP(p.name, p.prod);
@@ -399,7 +400,7 @@ function renderTable(res, custs, curDate) {
         + '</div>'
         + '</td>'
         + '<td class="p-3">' + pB + '</td>'
-        + '<td class="p-3 font-semibold text-[11px]">' + c.prod.split('\n')[0] + '<div class="text-[9px] text-slate-400 font-normal">\u1ee6 ' + cfg.w + 'p + L\u00e0m ' + cfg.e + 'p</div></td>'
+        + '<td class="p-3 font-semibold text-[11px]">' + c.prod.split('\n')[0] + '<div class="text-[9px] text-slate-400 font-normal">' + (cfg.unknown ? '<span class="text-rose-500">Ch\u01b0a nh\u1eadn di\u1ec7n</span>' : '\u1ee6 ' + cfg.w + 'p + L\u00e0m ' + cfg.e + 'p') + '</div></td>'
         + '<td class="p-3 font-medium text-slate-600 text-[11px]">' + c.arr + '</td>'
         + '<td class="p-3">' + bedHtml + '</td>'
         + '<td class="p-3">' + sB + '</td>'
