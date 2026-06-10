@@ -96,7 +96,9 @@ function mapSheetRow(cols) {
   const date = normDate((cols[0] || '').replace(/^"|"$/g, '').trim());
   const vl = detectVIPLevel(name);
   const pri = vl ? 3 : 1;
-  return { name, arr, prod, date, pri, rm: 'none', gender: detectGender(name), vipLevel: vl };
+  var gRaw = (cols[4] || '').replace(/^"|"$/g, '').trim().toLowerCase();
+  var gender = gRaw === 'nam' ? 'M' : (gRaw.startsWith('n') ? 'F' : detectGender(name));
+  return { name, arr, prod, date, pri, rm: 'none', gender, vipLevel: vl };
 }
 
 // --- Undo history ---
