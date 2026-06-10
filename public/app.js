@@ -7,7 +7,7 @@ const bedDefs = [
   { id: 2, name: "G2", room: "VIP 1", isT2: true },
   { id: 3, name: "G3", room: "VIP 2", isT2: true },
   { id: 4, name: "G4", room: "VIP 2", isT2: true },
-  { id: 5, name: "G5", room: "Lấy mẫu", isT2: false },
+  { id: 5, name: "G5", room: "Lấy mẫu", isT2: true },
   { id: 7, name: "G7", room: "Da liễu", isT2: false },
   { id: 8, name: "G8", room: "Da liễu", isT2: false },
   { id: 9, name: "G9", room: "Da liễu", isT2: false },
