@@ -131,7 +131,9 @@ let state = {
   rules: [
     { id: "r_msc",  keyword: "MSC",           wait: 60, exec: 135, requireT2: true,  label: "MSC",              priority: 1 },
     { id: "r_nk",   keyword: "NK",            wait: 20, exec: 135, requireT2: true,  label: "NK",               priority: 2 },
-    { id: "r_exo",  keyword: "EXO",           wait: 10, exec: 75,  requireT2: false, label: "EXO",              priority: 3 },
+    { id: "r_khangoxy", keyword: "KHANG OXY HOA", wait: 10, exec: 90,  requireT2: false, label: "Kháng oxy hóa (BS Hải)", priority: 2 },
+    { id: "r_duongchat", keyword: "DUONG CHAT", wait: 10, exec: 105, requireT2: false, label: "Dưỡng chất (BS Vân)", priority: 3 },
+    { id: "r_exo",  keyword: "EXO",           wait: 10, exec: 75,  requireT2: false, label: "EXO",              priority: 4 },
     { id: "r_nmn",  keyword: "NMN",           wait: 10, exec: 75,  requireT2: false, label: "NMN",              priority: 4 },
     { id: "r_sce",  keyword: "SCE",           wait: 10, exec: 75,  requireT2: false, label: "SCE",              priority: 5 },
     { id: "r_dondc_v",  keyword: "D/C VAN",   wait: 10, exec: 105, requireT2: false, label: "Đơn d/c (Vân)",    priority: 6 },

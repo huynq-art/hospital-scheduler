@@ -63,6 +63,8 @@ function getConf(raw) {
   var n = rmTones((raw || '').trim().toUpperCase());
   if(n.includes("MSC")) return { n: "MSC", w: 60, e: 135, r: true };
   if(n.includes("NK"))  return { n: "NK",  w: 20, e: 135, r: true };
+  if(n.includes("KHANG OXY HOA")) return { n: "Kháng oxy hóa (BS Hải)", w: 10, e: 90, r: false };
+  if(n.includes("DUONG CHAT")) return { n: "Dưỡng chất (BS Vân)", w: 10, e: 105, r: false };
   if(n.includes("NMN")||n.includes("SCE")||n.includes("EXO")) return { n: raw, w: 10, e: 75, r: false };
   if(n.includes("DON")) {
     const dc = n.includes("DUONG CHAT")||n.includes("D/C")||n.includes("DC");
