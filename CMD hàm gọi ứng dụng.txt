@@ -1,4 +1,0 @@
-cd đường/dẫn/muốn/lưu
-git clone https://github.com/huynq-art/hospital-scheduler.git
-cd hospital-scheduler
-npm install
