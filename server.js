@@ -73,7 +73,7 @@ function detectGender(name) {
   const parts = n.replace(/\s+\d+$/,'').split(/\s+/).filter(Boolean);
   const last = parts[parts.length-1] || '';
   const knownF = ['hồng','hương','lan','mai','hoa','nhung','hạnh','thúy','thủy','trang','ngọc','đào','liên','dung','hằng','vân','quỳnh','diệp','hà','tâm','mỹ','chi','oanh','liễu','huyền','uyên','phương','hiền','hòa','ngà','thơm'];
-  const knownM = ['đức','quang','tuấn','dũng','hùng','sơn','hải','phú','cường','trung','tiến','đạt','khánh','minh','bình','lâm','tùng','kiên','giang','thắng','linh','nam','khoa','phước','tín','nhân','trí','điều','sáng','hoan','thuyết','cúc','thái','oai','hưng','đức','thịnh'];
+  const knownM = ['đức','quang','tuấn','dũng','hùng','sơn','hải','phú','cường','trung','tiến','đạt','khánh','minh','bình','lâm','tùng','kiên','giang','thắng','linh','nam','khoa','phước','tín','nhân','trí','điều','sáng','hoan','thuyết','cúc','thái','oai','hưng','đức','thịnh','dậu'];
   if (knownF.includes(last)) return 'F';
   if (knownM.includes(last)) return 'M';
   return 'U';

@@ -107,7 +107,7 @@ function detectGender(name) {
   const parts = n.replace(/\s+\d+$/,'').split(/\s+/).filter(Boolean);
   const last = parts[parts.length-1] || '';
   const knownF = ['hồng','hương','lan','mai','hoa','nhung','hạnh','thúy','thủy','trang','ngọc','đào','liên','dung','hằng','vân','quỳnh','diệp','hà','tâm','mỹ','chi','oanh','liễu','huyền','uyên','phương','hiền','hòa','ngà','thơm'];
-  const knownM = ['đức','quang','tuấn','dũng','hùng','sơn','hải','phú','cường','trung','tiến','đạt','khánh','minh','bình','lâm','tùng','kiên','giang','thắng','linh','nam','khoa','phước','tín','nhân','trí','điều','sáng','hoan','thuyết','cúc','thái','oai','hưng','đức','thịnh'];
+  const knownM = ['đức','quang','tuấn','dũng','hùng','sơn','hải','phú','cường','trung','tiến','đạt','khánh','minh','bình','lâm','tùng','kiên','giang','thắng','linh','nam','khoa','phước','tín','nhân','trí','điều','sáng','hoan','thuyết','cúc','thái','oai','hưng','đức','thịnh','dậu'];
   if (knownF.includes(last)) return 'F';
   if (knownM.includes(last)) return 'M';
   return 'U';
@@ -200,9 +200,9 @@ function calcSched(custs, bedDefs, curDate, incWait) {
         if (isRoomLocked(b.room, search, e)) continue;
         // Gender separation: skip T2 bed if sibling has opposite gender (unless couple mode)
         if (b.isT2 && p.rm !== 'couple') {
-          const sib = beds.find(o => o.room === b.room && o.id !== b.id);
+          var sib = beds.find(function(o) { return o.room === b.room && o.id !== b.id; });
           if (sib) {
-            var oppG = sib.occ.some(function(o) { return o.type === 'b' && o.g && pg && o.g !== pg && o.g !== 'U' && pg !== 'U'; });
+            var oppG = sib.occ.some(function(o) { return o.type === 'b' && o.g && pg && o.g !== pg; });
             if (oppG) continue;
           }
         }
