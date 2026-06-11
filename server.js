@@ -3,15 +3,24 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const path = require('path');
-
-const fs = require('fs');
+const Database = require('better-sqlite3');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const DATA_FILE = path.join(__dirname, 'data', 'state.json');
+const DATA_DIR = path.join(__dirname, 'data');
+if (!require('fs').existsSync(DATA_DIR)) require('fs').mkdirSync(DATA_DIR, { recursive: true });
+const DB_PATH = path.join(DATA_DIR, 'hospital.db');
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+
+// Initialize tables
+db.exec(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -154,21 +163,45 @@ let state = {
   ]
 };
 
-// --- Persistence ---
+// --- Persistence (SQLite) ---
 function saveState() {
   try {
-    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ custs: state.custs, rules: state.rules }));
+    const delCust = db.prepare('DELETE FROM customers');
+    const insCust = db.prepare('INSERT INTO customers (id, data) VALUES (?, ?)');
+    const upsertRule = db.prepare('INSERT OR REPLACE INTO rules (id, data) VALUES (?, ?)');
+    const upsertSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+
+    const tx = db.transaction(() => {
+      delCust.run();
+      for (const c of state.custs) insCust.run(c.id, JSON.stringify(c));
+      for (const r of state.rules) upsertRule.run(r.id, JSON.stringify(r));
+      upsertSetting.run('incWait', String(state.incWait));
+      upsertSetting.run('curDate', state.curDate || '');
+      upsertSetting.run('version', String(state.version));
+    });
+    tx();
   } catch(e) { console.error('saveState error:', e.message); }
 }
 
 function loadState() {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      var saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-      if (saved.custs) state.custs = saved.custs;
-      if (saved.rules) state.rules = saved.rules;
-      console.log('  📂 Đã khôi phục ' + state.custs.length + ' KH từ file');
+    // Customers
+    const custRows = db.prepare('SELECT data FROM customers').all();
+    if (custRows.length > 0) {
+      state.custs = custRows.map(r => JSON.parse(r.data));
+      console.log('  📂 Đã khôi phục ' + state.custs.length + ' KH từ DB');
+    }
+    // Rules
+    const ruleRows = db.prepare('SELECT data FROM rules').all();
+    if (ruleRows.length > 0) {
+      state.rules = ruleRows.map(r => JSON.parse(r.data));
+    }
+    // Settings
+    const setRows = db.prepare('SELECT key, value FROM settings').all();
+    for (const s of setRows) {
+      if (s.key === 'incWait') state.incWait = s.value === 'true';
+      else if (s.key === 'curDate' && s.value) state.curDate = s.value;
+      else if (s.key === 'version') state.version = parseInt(s.value) || 0;
     }
   } catch(e) { console.error('loadState error:', e.message); }
 }
