@@ -880,20 +880,22 @@
     };
 
     window.saveEdit = async function() {
-        const id = document.getElementById('editId').value;
-        const mBed = document.getElementById('editBed').value;
-        const mTime = document.getElementById('editStartTime').value;
-        const mDur = parseInt(document.getElementById('editDur').value);
-        await api(`/api/customer/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ mBed, mTime, mDur: isNaN(mDur) ? null : mDur })
-        });
-        const c = window.__state?.custs.find(x => x.id === id);
-        if (c) { c.mBed = mBed; c.mTime = mTime; c.mDur = isNaN(mDur) ? undefined : mDur; }
-        renderAll(window.__state, false);
-        renderCustomerTable();
-        closeEdit();
-        msg('ok', 'Đã lưu chỉnh sửa!');
+        try {
+            const id = document.getElementById('editId').value;
+            const mBed = document.getElementById('editBed').value;
+            const mTime = document.getElementById('editStartTime').value;
+            const mDur = parseInt(document.getElementById('editDur').value);
+            await api(`/api/customer/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ mBed, mTime, mDur: isNaN(mDur) ? null : mDur })
+            });
+            const c = window.__state?.custs.find(x => x.id === id);
+            if (c) { c.mBed = mBed; c.mTime = mTime; c.mDur = isNaN(mDur) ? undefined : mDur; }
+            closeEdit();
+            renderAll(window.__state, false);
+            renderCustomerTable();
+            msg('ok', 'Đã lưu chỉnh sửa!');
+        } catch(e) { console.error('saveEdit err:', e); }
     };
 
     window.resetManual = async function() {
