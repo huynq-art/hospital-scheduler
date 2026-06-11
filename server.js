@@ -18,7 +18,13 @@ let db, usePg = false;
 
 if (DB_URL) {
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false }, family: 4 });
+  // Force IPv4 port for Supabase (6543 = IPv4, 5432 = IPv6-only)
+  let pgUrl = DB_URL;
+  try {
+    const u = new URL(DB_URL);
+    if (u.protocol === 'postgresql:' && u.port === '5432') { u.port = '6543'; pgUrl = u.toString(); }
+  } catch(e) {}
+  const pool = new Pool({ connectionString: pgUrl, ssl: { rejectUnauthorized: false } });
   db = pool;
   usePg = true;
   (async () => {
