@@ -3,7 +3,6 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const path = require('path');
-const Database = require('better-sqlite3');
 
 const app = express();
 app.use(cors());
@@ -12,15 +11,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const DATA_DIR = path.join(__dirname, 'data');
 if (!require('fs').existsSync(DATA_DIR)) require('fs').mkdirSync(DATA_DIR, { recursive: true });
-const DB_PATH = path.join(DATA_DIR, 'hospital.db');
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('synchronous = NORMAL');
 
-// Initialize tables
-db.exec(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
-db.exec(`CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
-db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+// --- Database setup: PostgreSQL (DATABASE_URL) or SQLite fallback ---
+const DB_URL = process.env.DATABASE_URL;
+let db, usePg = false;
+
+if (DB_URL) {
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+  db = pool;
+  usePg = true;
+  (async () => {
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+      console.log('  ✅ Kết nối PostgreSQL thành công');
+      await doLoadPg();
+    } catch(e) { console.error('PostgreSQL init error:', e.message); process.exit(1); }
+  })();
+} else {
+  const Database = require('better-sqlite3');
+  const dbPath = path.join(DATA_DIR, 'hospital.db');
+  db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
+  db.exec(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+  console.log('  ✅ Dùng SQLite');
+  doLoadSqlite();
+}
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -163,47 +184,87 @@ let state = {
   ]
 };
 
-// --- Persistence (SQLite) ---
+// --- Persistence (SQLite / PostgreSQL) ---
 function saveState() {
   try {
-    const delCust = db.prepare('DELETE FROM customers');
-    const insCust = db.prepare('INSERT INTO customers (id, data) VALUES (?, ?)');
-    const upsertRule = db.prepare('INSERT OR REPLACE INTO rules (id, data) VALUES (?, ?)');
-    const upsertSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-
-    const tx = db.transaction(() => {
-      delCust.run();
-      for (const c of state.custs) insCust.run(c.id, JSON.stringify(c));
-      for (const r of state.rules) upsertRule.run(r.id, JSON.stringify(r));
-      upsertSetting.run('incWait', String(state.incWait));
-      upsertSetting.run('curDate', state.curDate || '');
-      upsertSetting.run('version', String(state.version));
-    });
-    tx();
+    if (usePg) {
+      savePg().catch(e => console.error('savePg error:', e.message));
+    } else {
+      saveSqlite();
+    }
   } catch(e) { console.error('saveState error:', e.message); }
 }
 
-function loadState() {
+function saveSqlite() {
+  const delC = db.prepare('DELETE FROM customers');
+  const insC = db.prepare('INSERT INTO customers (id, data) VALUES (?, ?)');
+  const upsR = db.prepare('INSERT OR REPLACE INTO rules (id, data) VALUES (?, ?)');
+  const upsS = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+  const tx = db.transaction(() => {
+    delC.run();
+    for (const c of state.custs) insC.run(c.id, JSON.stringify(c));
+    for (const r of state.rules) upsR.run(r.id, JSON.stringify(r));
+    upsS.run('incWait', String(state.incWait));
+    upsS.run('curDate', state.curDate || '');
+    upsS.run('version', String(state.version));
+  });
+  tx();
+}
+
+async function savePg() {
+  const client = await db.connect();
   try {
-    // Customers
-    const custRows = db.prepare('SELECT data FROM customers').all();
-    if (custRows.length > 0) {
-      state.custs = custRows.map(r => JSON.parse(r.data));
-      console.log('  📂 Đã khôi phục ' + state.custs.length + ' KH từ DB');
+    await client.query('BEGIN');
+    await client.query('DELETE FROM customers');
+    for (const c of state.custs) {
+      await client.query('INSERT INTO customers (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2', [c.id, JSON.stringify(c)]);
     }
-    // Rules
-    const ruleRows = db.prepare('SELECT data FROM rules').all();
-    if (ruleRows.length > 0) {
-      state.rules = ruleRows.map(r => JSON.parse(r.data));
+    for (const r of state.rules) {
+      await client.query('INSERT INTO rules (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2', [r.id, JSON.stringify(r)]);
     }
-    // Settings
-    const setRows = db.prepare('SELECT key, value FROM settings').all();
+    await client.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', ['incWait', String(state.incWait)]);
+    await client.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', ['curDate', state.curDate || '']);
+    await client.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', ['version', String(state.version)]);
+    await client.query('COMMIT');
+  } catch(e) { await client.query('ROLLBACK'); throw e; }
+  finally { client.release(); }
+}
+
+function loadFromRows(custRows, ruleRows, setRows) {
+  if (custRows && custRows.length > 0) {
+    state.custs = custRows.map(r => JSON.parse(typeof r.data === 'string' ? r.data : r.data));
+    console.log('  📂 Đã khôi phục ' + state.custs.length + ' KH từ DB');
+  }
+  if (ruleRows && ruleRows.length > 0) {
+    state.rules = ruleRows.map(r => JSON.parse(typeof r.data === 'string' ? r.data : r.data));
+  }
+  if (setRows) {
     for (const s of setRows) {
       if (s.key === 'incWait') state.incWait = s.value === 'true';
       else if (s.key === 'curDate' && s.value) state.curDate = s.value;
       else if (s.key === 'version') state.version = parseInt(s.value) || 0;
     }
+  }
+}
+
+function doLoadSqlite() {
+  try {
+    const custRows = db.prepare('SELECT data FROM customers').all();
+    const ruleRows = db.prepare('SELECT data FROM rules').all();
+    const setRows = db.prepare('SELECT key, value FROM settings').all();
+    loadFromRows(custRows, ruleRows, setRows);
   } catch(e) { console.error('loadState error:', e.message); }
+}
+
+async function doLoadPg() {
+  try {
+    const custRows = (await db.query('SELECT data FROM customers')).rows;
+    const ruleRows = (await db.query('SELECT data FROM rules')).rows;
+    const setRows = (await db.query('SELECT key, value FROM settings')).rows;
+    loadFromRows(custRows, ruleRows, setRows);
+  } catch(e) { console.error('loadState error:', e.message); }
+  // Now start the server
+  startServer();
 }
 
 // Start empty — only Google Sheet data is used
@@ -218,11 +279,9 @@ try {
     if (saved.rules) state.rules = saved.rules;
     saveState();
     require('fs').renameSync(oldFile, oldFile + '.bak');
-    console.log('  📂 Đã migrate ' + state.custs.length + ' KH từ state.json → SQLite');
+    console.log('  📂 Đã migrate ' + state.custs.length + ' KH từ state.json → DB');
   }
 } catch(e) { console.log('migrate skip:', e.message); }
-
-loadState(); // restore from SQLite
 
 // --- Auto-fetch from Google Sheet (startup + periodic every 60s) ---
 function hasManualOverride(c) {
@@ -460,9 +519,14 @@ wss.on('connection', (ws) => {
 
 // --- Start ---
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  🏥 Hospital Scheduler running on http://localhost:${PORT}`);
-  console.log(`  📋 Admin:     http://localhost:${PORT}/admin.html`);
-  console.log(`  👁  Sales View: http://localhost:${PORT}/sales.html`);
-  console.log(`  🔌 API:       http://localhost:${PORT}/api/state\n`);
-});
+function startServer() {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n  🏥 Hospital Scheduler running on http://localhost:${PORT}`);
+    console.log(`  📋 Admin:     http://localhost:${PORT}/admin.html`);
+    console.log(`  👁  Sales View: http://localhost:${PORT}/sales.html`);
+    console.log(`  🔌 API:       http://localhost:${PORT}/api/state\n`);
+  });
+}
+
+// Start now (for SQLite) or after PostgreSQL init completes
+if (!usePg) startServer();
