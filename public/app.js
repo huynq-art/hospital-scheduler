@@ -159,7 +159,7 @@ function calcSched(custs, bedDefs, curDate, incWait) {
     const cfg = getConf(p.prod);
     if (cfg.unknown) return; // skip unrecognized services — user will set manually
     const dur = p.mDur ? +p.mDur : (incWait ? cfg.w+cfg.e : cfg.e);
-    const arrM = t2M(p.arr);
+    const arrM = p.mTime ? t2M(p.mTime) : t2M(p.arr);
     const v = isVIP(p.name, p.prod);
     const pg = genMap[p.id];
 

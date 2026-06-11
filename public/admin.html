@@ -889,14 +889,18 @@
 
     window.saveEdit = async function() {
         const id = document.getElementById('editId').value;
+        const mBed = document.getElementById('editBed').value;
+        const mTime = document.getElementById('editTimeToggle').checked ? document.getElementById('editStartTime').value : "";
+        const mDur = parseInt(document.getElementById('editDur').value);
         await api(`/api/customer/${id}`, {
             method: 'PUT',
-            body: JSON.stringify({
-                mBed: document.getElementById('editBed').value,
-                mTime: document.getElementById('editTimeToggle').checked ? document.getElementById('editStartTime').value : "",
-                mDur: parseInt(document.getElementById('editDur').value)
-            })
+            body: JSON.stringify({ mBed, mTime, mDur })
         });
+        // Update local state & re-render immediately (don't wait for WS)
+        const c = window.__state?.custs.find(x => x.id === id);
+        if (c) { c.mBed = mBed; c.mTime = mTime; c.mDur = isNaN(mDur) ? undefined : mDur; }
+        renderAll(window.__state, false);
+        renderCustomerTable();
         closeEdit();
         msg('ok', 'Đã lưu chỉnh sửa!');
     };
@@ -907,6 +911,10 @@
             method: 'PUT',
             body: JSON.stringify({ mBed: "auto", mTime: "", mDur: null })
         });
+        const c = window.__state?.custs.find(x => x.id === id);
+        if (c) { c.mBed = "auto"; c.mTime = ""; c.mDur = undefined; }
+        renderAll(window.__state, false);
+        renderCustomerTable();
         closeEdit();
         msg('ok', 'Đã trả về cho AI tự xếp!');
     };
