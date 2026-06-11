@@ -275,7 +275,7 @@
     <div id="editModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
             <div class="p-5 border-b border-slate-100 flex justify-between">
-                <h3 class="font-bold text-slate-900"><i class="fa-solid fa-user-pen text-emerald-500"></i> Điều chỉnh đè lịch</h3>
+                <h3 class="font-bold text-slate-900"><i class="fa-regular fa-clock text-emerald-500"></i> Sửa giờ truyền</h3>
                 <button onclick="closeEdit()"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-5 space-y-4 text-sm">
@@ -283,7 +283,7 @@
                 <div><label class="block font-semibold mb-1 text-xs">Khách hàng</label><input id="editName" disabled class="w-full px-3 py-2 bg-slate-50 border rounded-lg"></div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block font-semibold mb-1 text-xs text-emerald-600">1. Chỉ định giường</label>
+                        <label class="block font-semibold mb-1 text-xs text-emerald-600">Giường</label>
                         <select id="editBed" class="w-full px-3 py-2 border rounded-lg font-medium">
                             <option value="auto">🤖 Tự động AI</option>
                             <option value="1">Giường 1 (T2)</option><option value="2">Giường 2 (T2)</option>
@@ -293,15 +293,14 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-semibold mb-1 text-xs text-emerald-600">2. Chỉ định giờ</label>
-                        <div class="flex gap-1 items-center mt-2 mb-1 text-xs"><input type="checkbox" id="editTimeToggle" onchange="toggleTimeInput(this)"><label>Ghi đè giờ</label></div>
-                        <input id="editStartTime" type="time" class="w-full px-3 py-1 border rounded-lg hidden">
+                        <label class="block font-semibold mb-1 text-xs text-emerald-600">Giờ bắt đầu</label>
+                        <input id="editStartTime" type="time" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                 </div>
-                <div><label class="block font-semibold mb-1 text-xs text-emerald-600">3. Số phút nằm giường</label><input id="editDur" type="number" class="w-full px-3 py-2 border rounded-lg"></div>
+                <div><label class="block font-semibold mb-1 text-xs text-emerald-600">Số phút nằm giường</label><input id="editDur" type="number" class="w-full px-3 py-2 border rounded-lg"></div>
             </div>
             <div class="bg-slate-50 p-4 border-t flex justify-between">
-                <button onclick="resetManual()" class="text-rose-600 text-xs font-bold px-3 py-2 bg-rose-50 rounded-lg">Xóa đè</button>
+                <button onclick="resetManual()" class="text-rose-600 text-xs font-bold px-3 py-2 bg-rose-50 rounded-lg">Xóa override</button>
                 <div class="flex gap-2">
                     <button onclick="closeEdit()" class="px-4 py-2 text-sm font-semibold rounded-lg bg-white border">Hủy</button>
                     <button onclick="saveEdit()" class="px-4 py-2 text-sm font-bold text-white bg-slate-900 rounded-lg">Lưu</button>
@@ -869,34 +868,26 @@
     };
 
     // --- Edit Modal ---
-    window.openEdit = function(id) {
+    window.openEdit = function(id, bedId, sTime, dur) {
         const c = window.__state?.custs.find(x => x.id === id);
         if(!c) return;
         document.getElementById('editId').value = c.id;
         document.getElementById('editName').value = c.name;
-        document.getElementById('editBed').value = c.mBed || 'auto';
-        document.getElementById('editTimeToggle').checked = !!c.mTime;
-        document.getElementById('editStartTime').classList.toggle('hidden', !c.mTime);
-        document.getElementById('editStartTime').value = c.mTime || c.arr;
-        const cfg = getConf(c.prod);
-        const incWait = window.__state?.incWait ?? true;
-        document.getElementById('editDur').value = c.mDur ? c.mDur : (incWait ? cfg.w+cfg.e : cfg.e);
+        document.getElementById('editBed').value = (bedId != null) ? String(bedId) : (c.mBed || 'auto');
+        document.getElementById('editStartTime').value = sTime || c.mTime || c.arr;
+        document.getElementById('editDur').value = dur || c.mDur || 0;
         document.getElementById('editModal').classList.remove('hidden');
     };
-
-    window.closeEdit = function() { document.getElementById('editModal').classList.add('hidden'); };
-    window.toggleTimeInput = function(cb) { document.getElementById('editStartTime').classList.toggle('hidden', !cb.checked); };
 
     window.saveEdit = async function() {
         const id = document.getElementById('editId').value;
         const mBed = document.getElementById('editBed').value;
-        const mTime = document.getElementById('editTimeToggle').checked ? document.getElementById('editStartTime').value : "";
+        const mTime = document.getElementById('editStartTime').value;
         const mDur = parseInt(document.getElementById('editDur').value);
         await api(`/api/customer/${id}`, {
             method: 'PUT',
-            body: JSON.stringify({ mBed, mTime, mDur })
+            body: JSON.stringify({ mBed, mTime, mDur: isNaN(mDur) ? null : mDur })
         });
-        // Update local state & re-render immediately (don't wait for WS)
         const c = window.__state?.custs.find(x => x.id === id);
         if (c) { c.mBed = mBed; c.mTime = mTime; c.mDur = isNaN(mDur) ? undefined : mDur; }
         renderAll(window.__state, false);

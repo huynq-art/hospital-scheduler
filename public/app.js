@@ -313,7 +313,7 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
       : (i.vipLevel === 'V' || i.pri==3 || i.v) ? '<i class="fa-solid fa-crown text-amber-500 text-[10px]"></i>' : '';
     const mIc = i.man ? '✍️' : '';
     const dragAttr = isReadOnly ? '' : `draggable="true" ondragstart="event.dataTransfer.setData('text/plain', JSON.stringify({id:'${i.id}',dur:${i.dur}}))"`;
-    const clickAttr = isReadOnly ? '' : `onclick="openEdit('${i.id}')"`;
+    const clickAttr = isReadOnly ? '' : `onclick="openEdit('${i.id}',${i.bId},'${i.sTime}',${i.dur})"`;
 
     lane.innerHTML += `
       <div ${dragAttr} ${clickAttr} class="absolute h-[62px] top-[2px] rounded-lg border p-1.5 cursor-pointer shadow-sm overflow-hidden flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
