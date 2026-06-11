@@ -4,10 +4,14 @@ const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const path = require('path');
 
+const fs = require('fs');
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+const DATA_FILE = path.join(__dirname, 'data', 'state.json');
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -150,8 +154,28 @@ let state = {
   ]
 };
 
+// --- Persistence ---
+function saveState() {
+  try {
+    if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ custs: state.custs, rules: state.rules }));
+  } catch(e) { console.error('saveState error:', e.message); }
+}
+
+function loadState() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      var saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      if (saved.custs) state.custs = saved.custs;
+      if (saved.rules) state.rules = saved.rules;
+      console.log('  📂 Đã khôi phục ' + state.custs.length + ' KH từ file');
+    }
+  } catch(e) { console.error('loadState error:', e.message); }
+}
+
 // Start empty — only Google Sheet data is used
 state.custs = [];
+loadState(); // restore manual edits from file
 
 // --- Auto-fetch from Google Sheet (startup + periodic every 60s) ---
 function hasManualOverride(c) {
@@ -228,6 +252,7 @@ function broadcast(data) {
 function syncClients() {
   state.version++;
   state.undoCount = undoStack.length;
+  saveState();
   broadcast({ type: 'state', state });
 }
 
