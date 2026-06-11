@@ -471,25 +471,33 @@
     };
 
     window.exportGanttImage = function() {
-        var gantt = document.querySelector('.overflow-x-auto');
-        if (!gantt) return;
+        var ganttWrap = document.querySelector('.overflow-x-auto');
+        if (!ganttWrap) return;
+        var inner = ganttWrap.children[0];
         var btn = document.getElementById('exportImgBtn');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
-        var origOverflow = gantt.style.overflowX;
-        gantt.style.overflowX = 'visible';
-        gantt.style.maxHeight = 'none';
+        var fullW = inner.scrollWidth;
+        var fullH = inner.scrollHeight + 40;
+        var origOverflow = ganttWrap.style.overflowX;
+        var origWidth = ganttWrap.style.width;
+        var origMaxW = ganttWrap.style.maxWidth;
+        ganttWrap.style.overflowX = 'visible';
+        ganttWrap.style.width = fullW + 'px';
+        ganttWrap.style.maxWidth = fullW + 'px';
         var cd = window.__state ? dFmt(window.__state.curDate || todayVi()) : 'Gantt';
-        html2canvas(gantt, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' }).then(function(canvas) {
-            gantt.style.overflowX = origOverflow;
-            gantt.style.maxHeight = '';
+        html2canvas(ganttWrap, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff', width: fullW, height: fullH, logging: false }).then(function(canvas) {
+            ganttWrap.style.overflowX = origOverflow;
+            ganttWrap.style.width = origWidth;
+            ganttWrap.style.maxWidth = origMaxW;
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xuất ảnh'; }
             var link = document.createElement('a');
             link.download = 'lich_truyen_' + cd.replace(/\//g, '-') + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
         }).catch(function(err) {
-            gantt.style.overflowX = origOverflow;
-            gantt.style.maxHeight = '';
+            ganttWrap.style.overflowX = origOverflow;
+            ganttWrap.style.width = origWidth;
+            ganttWrap.style.maxWidth = origMaxW;
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xuất ảnh'; }
             console.error('exportGanttImage:', err);
         });
