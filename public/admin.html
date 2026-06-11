@@ -899,17 +899,19 @@
     };
 
     window.resetManual = async function() {
-        const id = document.getElementById('editId').value;
-        await api(`/api/customer/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ mBed: "auto", mTime: "", mDur: null })
-        });
-        const c = window.__state?.custs.find(x => x.id === id);
-        if (c) { c.mBed = "auto"; c.mTime = ""; c.mDur = undefined; }
-        renderAll(window.__state, false);
-        renderCustomerTable();
-        closeEdit();
-        msg('ok', 'Đã trả về cho AI tự xếp!');
+        try {
+            const id = document.getElementById('editId').value;
+            await api(`/api/customer/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ mBed: "auto", mTime: "", mDur: null })
+            });
+            const c = window.__state?.custs.find(x => x.id === id);
+            if (c) { c.mBed = "auto"; c.mTime = ""; c.mDur = undefined; }
+            closeEdit();
+            renderAll(window.__state, false);
+            renderCustomerTable();
+            msg('ok', 'Đã trả về cho AI tự xếp!');
+        } catch(e) { console.error('resetManual err:', e); }
     };
 
     // --- Standalone Customer Table (no dependencies) ---
