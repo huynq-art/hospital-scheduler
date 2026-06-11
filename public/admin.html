@@ -886,6 +886,8 @@
         } catch(e) { console.error('openEdit err:', e); }
     };
 
+    window.closeEdit = function() { document.getElementById('editModal').classList.add('hidden'); };
+
     window.saveEdit = async function() {
         try {
             const id = document.getElementById('editId').value;
