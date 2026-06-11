@@ -18,7 +18,7 @@ let db, usePg = false;
 
 if (DB_URL) {
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+  const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false }, family: 4 });
   db = pool;
   usePg = true;
   (async () => {
