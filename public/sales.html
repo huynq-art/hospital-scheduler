@@ -307,7 +307,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-span-10 relative bg-slate-800/30 border border-slate-800 rounded-xl h-[58px] w-full" id="slane-${b.id}"></div>
+                    <div class="col-span-10 relative bg-slate-800/30 border border-slate-800 rounded-xl h-[66px] w-full" id="slane-${b.id}"></div>
                 </div>`;
         });
         document.getElementById('salesBedLanes').innerHTML = html;
@@ -329,10 +329,10 @@
             const mIc = i.man ? '✍️' : '';
 
             lane.innerHTML += `
-                <div class="absolute h-[52px] top-[2px] rounded-lg border p-1.5 overflow-hidden flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
+                <div class="absolute h-[60px] top-[2px] rounded-lg border p-1.5 overflow-hidden flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
                     <div class="font-bold text-[10px] truncate leading-tight text-white">${vIc} ${mIc} ${i.name}</div>
                     <div class="text-[9px] truncate text-slate-400 font-semibold">${i.prod}</div>
-                    <div class="text-[9px] font-medium mt-0.5 border-t border-slate-700/50 pt-0.5 flex justify-between text-slate-400">
+                    <div class="text-[8px] font-medium flex justify-between text-slate-500">
                         <span>${i.sTime}-${i.eTime}</span><span class="opacity-70">${i.dur}p</span>
                     </div>
                 </div>`;
@@ -346,7 +346,7 @@
                     const wPct = Math.min(100-lPct, ((o.e-o.s)/600)*100);
                     const lane = document.getElementById(`slane-${b.id}`);
                     if(lane) lane.innerHTML += `
-                        <div class="absolute h-[52px] top-[2px] rounded-lg border border-dashed bg-striped-blocked flex flex-col items-center justify-center pointer-events-none" style="left:${lPct}%; width:${wPct}%">
+                        <div class="absolute h-[56px] top-[2px] rounded-lg border border-dashed bg-striped-blocked flex flex-col items-center justify-center pointer-events-none" style="left:${lPct}%; width:${wPct}%">
                             <span class="text-[9px] font-bold text-slate-500">🔒 Khóa</span>
                         </div>`;
                 }
