@@ -301,10 +301,10 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
     const lPct = Math.max(0, ((i.start - 480)/600)*100);
     const wPct = Math.min(100-lPct, (i.dur/600)*100);
 
-    let cl = i.man ? "border-dashed border-2 ring-2 ring-emerald-400 border-emerald-500 bg-emerald-50 text-emerald-900"
-      : i.vipLevel === 'VV' ? "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300"
-      : i.vipLevel === 'V' ? "bg-violet-50 border-violet-400 text-violet-900"
-      : i.v ? "bg-violet-50 border-violet-400 text-violet-900"
+    let cl = i.vipLevel === 'VV' ? (i.man ? "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300 border-dashed border-2" : "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300")
+      : i.vipLevel === 'V' ? (i.man ? "bg-violet-50 border-violet-400 text-violet-900 border-dashed border-2 ring-2 ring-violet-300" : "bg-violet-50 border-violet-400 text-violet-900")
+      : i.v ? (i.man ? "bg-violet-50 border-violet-400 text-violet-900 border-dashed border-2 ring-2 ring-violet-300" : "bg-violet-50 border-violet-400 text-violet-900")
+      : i.man ? "border-dashed border-2 ring-2 ring-emerald-400 border-emerald-500 bg-emerald-50 text-emerald-900"
       : i.cfg.r ? "bg-rose-50 border-rose-400 text-rose-900"
       : i.wait>0 ? "bg-amber-50 border-amber-300 text-amber-900"
       : "bg-emerald-50 border-emerald-300 text-emerald-900";
