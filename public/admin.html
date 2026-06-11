@@ -272,7 +272,7 @@
     </main>
 
     <!-- EDIT MODAL -->
-    <div id="editModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+    <div id="editModal" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-50 p-4" onclick="if(event.target===this)closeEdit()">
         <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
             <div class="p-5 border-b border-slate-100 flex justify-between">
                 <h3 class="font-bold text-slate-900"><i class="fa-regular fa-clock text-emerald-500"></i> Sửa giờ truyền</h3>
@@ -309,8 +309,13 @@
         </div>
     </div>
 
-    <script src="/app.js?r=16"></script>
+    <script src="/app.js?r=17"></script>
     <script>
+    // Global error handler
+    window.onerror = function(msg, url, line, col, err) {
+        console.error('GLOBAL ERROR:', msg, err);
+        alert('Lỗi: ' + (err && err.message ? err.message : msg));
+    };
     // --- WebSocket Connection ---
     let ws = null;
     const wsIndicator = document.getElementById('wsIndicator');
@@ -869,14 +874,16 @@
 
     // --- Edit Modal ---
     window.openEdit = function(id, bedId, sTime, dur) {
-        const c = window.__state?.custs.find(x => x.id === id);
-        if(!c) return;
-        document.getElementById('editId').value = c.id;
-        document.getElementById('editName').value = c.name;
-        document.getElementById('editBed').value = (bedId != null) ? String(bedId) : (c.mBed || 'auto');
-        document.getElementById('editStartTime').value = sTime || c.mTime || c.arr;
-        document.getElementById('editDur').value = dur || c.mDur || 0;
-        document.getElementById('editModal').classList.remove('hidden');
+        try {
+            const c = window.__state?.custs.find(x => x.id === id);
+            if(!c) return;
+            document.getElementById('editId').value = c.id;
+            document.getElementById('editName').value = c.name;
+            document.getElementById('editBed').value = (bedId != null) ? String(bedId) : (c.mBed || 'auto');
+            document.getElementById('editStartTime').value = sTime || c.mTime || c.arr;
+            document.getElementById('editDur').value = dur || c.mDur || 0;
+            document.getElementById('editModal').classList.remove('hidden');
+        } catch(e) { console.error('openEdit err:', e); }
     };
 
     window.saveEdit = async function() {
@@ -885,14 +892,18 @@
             const mBed = document.getElementById('editBed').value;
             const mTime = document.getElementById('editStartTime').value;
             const mDur = parseInt(document.getElementById('editDur').value);
-            await api(`/api/customer/${id}`, {
+            const r = await fetch('/api/customer/' + id, {
                 method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mBed, mTime, mDur: isNaN(mDur) ? null : mDur })
             });
-            const c = window.__state?.custs.find(x => x.id === id);
-            if (c) { c.mBed = mBed; c.mTime = mTime; c.mDur = isNaN(mDur) ? undefined : mDur; }
+            await r.json();
             closeEdit();
-            renderAll(window.__state, false);
+            // Fetch fresh state to ensure consistency
+            const sr = await fetch('/api/state');
+            const st = await sr.json();
+            window.__state = st;
+            renderAll(st, false);
             renderCustomerTable();
             msg('ok', 'Đã lưu chỉnh sửa!');
         } catch(e) { console.error('saveEdit err:', e); }
@@ -901,14 +912,16 @@
     window.resetManual = async function() {
         try {
             const id = document.getElementById('editId').value;
-            await api(`/api/customer/${id}`, {
+            await fetch('/api/customer/' + id, {
                 method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mBed: "auto", mTime: "", mDur: null })
             });
-            const c = window.__state?.custs.find(x => x.id === id);
-            if (c) { c.mBed = "auto"; c.mTime = ""; c.mDur = undefined; }
             closeEdit();
-            renderAll(window.__state, false);
+            const sr = await fetch('/api/state');
+            const st = await sr.json();
+            window.__state = st;
+            renderAll(st, false);
             renderCustomerTable();
             msg('ok', 'Đã trả về cho AI tự xếp!');
         } catch(e) { console.error('resetManual err:', e); }
