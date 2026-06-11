@@ -471,34 +471,62 @@
     };
 
     window.exportGanttImage = function() {
-        var ganttWrap = document.querySelector('.overflow-x-auto');
-        if (!ganttWrap) return;
-        var inner = ganttWrap.children[0];
+        var st = window.__state;
+        if (!st) return;
         var btn = document.getElementById('exportImgBtn');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
-        var fullW = inner.scrollWidth;
-        var fullH = inner.scrollHeight + 40;
-        var origOverflow = ganttWrap.style.overflowX;
-        var origWidth = ganttWrap.style.width;
-        var origMaxW = ganttWrap.style.maxWidth;
-        ganttWrap.style.overflowX = 'visible';
-        ganttWrap.style.width = fullW + 'px';
-        ganttWrap.style.maxWidth = fullW + 'px';
-        var cd = window.__state ? dFmt(window.__state.curDate || todayVi()) : 'Gantt';
-        html2canvas(ganttWrap, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff', width: fullW, height: fullH, logging: false }).then(function(canvas) {
-            ganttWrap.style.overflowX = origOverflow;
-            ganttWrap.style.width = origWidth;
-            ganttWrap.style.maxWidth = origMaxW;
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xuất ảnh'; }
+        var cd = st.curDate || todayVi();
+        var sched = calcSched(st.custs, st.bedDefs, cd, st.incWait);
+        var res = sched.res, beds = sched.beds;
+        // Build clean table - only occupied beds
+        var usedBeds = {};
+        for (var i = 0; i < res.length; i++) usedBeds[res[i].bId] = true;
+        var html = '<div style="font-family:Inter,sans-serif;padding:20px">';
+        html += '<h2 style="margin:0 0 4px;font-size:18px;font-weight:700">S\u01a1 \u0111\u1ed3 l\u1ecbch truy\u1ec1n</h2>';
+        html += '<p style="margin:0 0 16px;font-size:12px;color:#666">' + dFmt(cd) + '</p>';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+        html += '<thead><tr style="background:#f1f5f9">';
+        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Gi\u01b0\u1eddng</th>';
+        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Ph\u00f2ng</th>';
+        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Kh\u00e1ch h\u00e0ng</th>';
+        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">D\u1ecbch v\u1ee5</th>';
+        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Gi\u1edd</th>';
+        html += '<th style="border:1px solid #ddd;padding:6px;text-align:right">Ph\u00fat</th>';
+        html += '</tr></thead><tbody>';
+        var count = 0;
+        for (var i = 0; i < res.length; i++) {
+            var r = res[i];
+            if (!usedBeds[r.bId]) continue;
+            count++;
+            var vip = r.vipLevel === 'VV' ? '\u{1F451}\u{1F451}' : (r.vipLevel === 'V' ? '\u{1F451}' : (r.pri >= 3 ? '\u{1F451}' : ''));
+            html += '<tr>';
+            html += '<td style="border:1px solid #ddd;padding:5px;font-weight:600">' + r.bName + '</td>';
+            html += '<td style="border:1px solid #ddd;padding:5px">' + r.bRm + '</td>';
+            html += '<td style="border:1px solid #ddd;padding:5px">' + vip + ' ' + r.name + '</td>';
+            html += '<td style="border:1px solid #ddd;padding:5px;font-size:10px">' + (r.prod || '').split('\n')[0] + '</td>';
+            html += '<td style="border:1px solid #ddd;padding:5px;white-space:nowrap">' + r.sTime + ' - ' + r.eTime + '</td>';
+            html += '<td style="border:1px solid #ddd;padding:5px;text-align:right">' + r.dur + '</td>';
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        html += '<p style="margin:12px 0 0;font-size:10px;color:#999;text-align:right">T\u1ed5ng: ' + count + ' b\u1ec7nh nh\u00e2n</p>';
+        html += '</div>';
+        var tmp = document.createElement('div');
+        tmp.style.position = 'absolute';
+        tmp.style.left = '-9999px';
+        tmp.style.top = '0';
+        tmp.innerHTML = html;
+        document.body.appendChild(tmp);
+        html2canvas(tmp, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff', logging: false }).then(function(canvas) {
+            document.body.removeChild(tmp);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xu\u1ea5t \u1ea3nh'; }
             var link = document.createElement('a');
-            link.download = 'lich_truyen_' + cd.replace(/\//g, '-') + '.png';
+            link.download = 'lich_truyen_' + dFmt(cd).replace(/\//g, '-') + '.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
         }).catch(function(err) {
-            ganttWrap.style.overflowX = origOverflow;
-            ganttWrap.style.width = origWidth;
-            ganttWrap.style.maxWidth = origMaxW;
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xuất ảnh'; }
+            document.body.removeChild(tmp);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xu\u1ea5t \u1ea3nh'; }
             console.error('exportGanttImage:', err);
         });
     };
