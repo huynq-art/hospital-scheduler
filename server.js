@@ -208,7 +208,21 @@ function loadState() {
 
 // Start empty — only Google Sheet data is used
 state.custs = [];
-loadState(); // restore manual edits from file
+
+// Migrate from state.json if exists (first run after SQLite migration)
+try {
+  const oldFile = path.join(DATA_DIR, 'state.json');
+  if (require('fs').existsSync(oldFile)) {
+    var saved = JSON.parse(require('fs').readFileSync(oldFile, 'utf-8'));
+    if (saved.custs) state.custs = saved.custs;
+    if (saved.rules) state.rules = saved.rules;
+    saveState();
+    require('fs').renameSync(oldFile, oldFile + '.bak');
+    console.log('  📂 Đã migrate ' + state.custs.length + ' KH từ state.json → SQLite');
+  }
+} catch(e) { console.log('migrate skip:', e.message); }
+
+loadState(); // restore from SQLite
 
 // --- Auto-fetch from Google Sheet (startup + periodic every 60s) ---
 function hasManualOverride(c) {
