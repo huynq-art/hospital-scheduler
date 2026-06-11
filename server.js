@@ -18,6 +18,7 @@ let db, usePg = false;
 
 if (DB_URL) {
   const { Pool } = require('pg');
+  usePg = true;
   // Manually resolve IPv4 since Render may not support IPv6
   (async () => {
     try {
@@ -34,7 +35,6 @@ if (DB_URL) {
         ssl: { rejectUnauthorized: false }
       });
       db = pool;
-      usePg = true;
       await pool.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
       await pool.query(`CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
       await pool.query(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
@@ -43,11 +43,9 @@ if (DB_URL) {
     } catch(e) {
       console.error('PostgreSQL init error:', e.message);
       if (e.message.includes('getaddrinfo') || e.message.includes('No IPv4 address')) {
-        // Fallback: try connection string directly as last resort
         try {
           const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
           db = pool;
-          usePg = true;
           await pool.query('SELECT 1');
           console.log('  ✅ PostgreSQL fallback OK');
           await doLoadPg();
