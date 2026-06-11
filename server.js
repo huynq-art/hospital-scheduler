@@ -18,19 +18,47 @@ let db, usePg = false;
 
 if (DB_URL) {
   const { Pool } = require('pg');
-  const dns = require('dns');
-  dns.setDefaultResultOrder('ipv4first');
-  const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
-  db = pool;
-  usePg = true;
+  // Manually resolve IPv4 since Render may not support IPv6
   (async () => {
     try {
+      const dns = require('dns');
+      const m = DB_URL.match(/^postgres(?:ql)?:\/\/([^:]+):([^@]+)@(.+?)(?::(\d+))?\/(.+?)(?:\?.*)?$/);
+      if (!m) throw new Error('Cannot parse connection string');
+      const user = m[1], password = m[2], host = m[3], port = parseInt(m[4]) || 5432, database = m[5];
+      let addresses;
+      try { addresses = await dns.promises.resolve4(host); } catch(e) { addresses = []; }
+      if (addresses.length === 0) throw new Error('No IPv4 address found for ' + host);
+      console.log('  🌐 PostgreSQL host ' + host + ' → ' + addresses[0] + ':' + port);
+      const pool = new Pool({
+        host: addresses[0], port, user, password, database,
+        ssl: { rejectUnauthorized: false }
+      });
+      db = pool;
+      usePg = true;
       await pool.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
       await pool.query(`CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, data TEXT NOT NULL)`);
       await pool.query(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
       console.log('  ✅ Kết nối PostgreSQL thành công');
       await doLoadPg();
-    } catch(e) { console.error('PostgreSQL init error:', e.message); process.exit(1); }
+    } catch(e) {
+      console.error('PostgreSQL init error:', e.message);
+      if (e.message.includes('getaddrinfo') || e.message.includes('No IPv4 address')) {
+        // Fallback: try connection string directly as last resort
+        try {
+          const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+          db = pool;
+          usePg = true;
+          await pool.query('SELECT 1');
+          console.log('  ✅ PostgreSQL fallback OK');
+          await doLoadPg();
+        } catch(e2) {
+          console.error('PostgreSQL fallback also failed:', e2.message);
+          process.exit(1);
+        }
+      } else {
+        process.exit(1);
+      }
+    }
   })();
 } else {
   const Database = require('better-sqlite3');
