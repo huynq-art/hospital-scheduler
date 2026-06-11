@@ -10,6 +10,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
@@ -218,9 +219,14 @@
                     <h3 class="font-semibold text-slate-900 flex items-center gap-2 text-sm">
                         <i class="fa-solid fa-chart-gantt text-emerald-500"></i> Biểu Đồ Gantt
                     </h3>
-                    <div class="flex gap-3 text-[10px] font-medium">
-                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-violet-100 border border-violet-400"></span> VIP/Đặc quyền</span>
-                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded border border-dashed border-emerald-500"></span> Sửa đè tay</span>
+                    <div class="flex items-center gap-3">
+                        <div class="flex gap-3 text-[10px] font-medium">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-violet-100 border border-violet-400"></span> VIP/Đặc quyền</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded border border-dashed border-emerald-500"></span> Sửa đè tay</span>
+                        </div>
+                        <button onclick="exportGanttImage()" id="exportImgBtn" class="px-3 py-1.5 text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center gap-1.5">
+                            <i class="fa-solid fa-image"></i> Xuất ảnh
+                        </button>
                     </div>
                 </div>
                 <div class="p-4 overflow-x-auto custom-scrollbar">
@@ -462,6 +468,31 @@
             renderAll(window.__state, false);
         }
         await api('/api/settings', { method: 'PUT', body: JSON.stringify({ curDate: d }) });
+    };
+
+    window.exportGanttImage = function() {
+        var gantt = document.querySelector('.overflow-x-auto');
+        if (!gantt) return;
+        var btn = document.getElementById('exportImgBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+        var origOverflow = gantt.style.overflowX;
+        gantt.style.overflowX = 'visible';
+        gantt.style.maxHeight = 'none';
+        var cd = window.__state ? dFmt(window.__state.curDate || todayVi()) : 'Gantt';
+        html2canvas(gantt, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff' }).then(function(canvas) {
+            gantt.style.overflowX = origOverflow;
+            gantt.style.maxHeight = '';
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xuất ảnh'; }
+            var link = document.createElement('a');
+            link.download = 'lich_truyen_' + cd.replace(/\//g, '-') + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }).catch(function(err) {
+            gantt.style.overflowX = origOverflow;
+            gantt.style.maxHeight = '';
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xuất ảnh'; }
+            console.error('exportGanttImage:', err);
+        });
     };
 
     window.testRule = function(v) {
