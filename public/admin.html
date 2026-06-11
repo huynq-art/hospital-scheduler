@@ -486,7 +486,7 @@
         }
 
         var T_MIN = 420, T_MAX = 1020, T_RANGE = T_MAX - T_MIN;
-        var LBL_W = 130, ROW_H = 48, TITLE_H = 30, HDR_H = 30, PAD = 12;
+        var LBL_W = 130, ROW_H = 54, TITLE_H = 30, HDR_H = 30, PAD = 12;
         var timeW = 1020;
         var totalW = LBL_W + timeW + PAD*2;
         var totalH = TITLE_H + HDR_H + beds.length * ROW_H + PAD*2;
@@ -631,18 +631,34 @@
                     ctx.textBaseline = 'top';
                     var tx = bx + 4, ty = by + 3;
                     var maxTw = bw - 8;
-                    var name = item.lock ? '\u{1F512} Kh\xf3a' : item.name;
+                    var name = item.lock ? 'K' : item.name;
                     if (ctx.measureText(name).width > maxTw) {
                         while (ctx.measureText(name + '\u2026').width > maxTw && name.length > 1)
                             name = name.slice(0, -1);
                         name += '\u2026';
                     }
                     ctx.fillText(name, tx, ty);
-                    if (!item.lock && bw > 50) {
-                        ctx.font = '9px Inter, sans-serif';
+                    if (!item.lock && bw > 60) {
+                        // product name
+                        ctx.font = '8px Inter, sans-serif';
+                        var prod = (item.prod || '').split('\n')[0];
+                        if (prod) {
+                            if (ctx.measureText(prod).width > maxTw) {
+                                while (ctx.measureText(prod + '\u2026').width > maxTw && prod.length > 1)
+                                    prod = prod.slice(0, -1);
+                                prod += '\u2026';
+                            }
+                            ctx.fillText(prod, tx, ty + 13);
+                        }
+                        // time range
+                        ctx.font = '8px Inter, sans-serif';
                         var tStr = item.sTime + '-' + item.eTime;
                         if (ctx.measureText(tStr).width > maxTw)
                             tStr = item.dur + 'p';
+                        ctx.fillText(tStr, tx, ty + (prod ? 24 : 14));
+                    } else if (!item.lock && bw > 30) {
+                        ctx.font = '8px Inter, sans-serif';
+                        var tStr = item.dur + 'p';
                         ctx.fillText(tStr, tx, ty + 14);
                     }
                 }
