@@ -478,56 +478,184 @@
         var cd = st.curDate || todayVi();
         var sched = calcSched(st.custs, st.bedDefs, cd, st.incWait);
         var res = sched.res, beds = sched.beds;
-        // Build clean table - only occupied beds
-        var usedBeds = {};
-        for (var i = 0; i < res.length; i++) usedBeds[res[i].bId] = true;
-        var html = '<div style="font-family:Inter,sans-serif;padding:20px">';
-        html += '<h2 style="margin:0 0 4px;font-size:18px;font-weight:700">S\u01a1 \u0111\u1ed3 l\u1ecbch truy\u1ec1n</h2>';
-        html += '<p style="margin:0 0 16px;font-size:12px;color:#666">' + dFmt(cd) + '</p>';
-        html += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
-        html += '<thead><tr style="background:#f1f5f9">';
-        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Gi\u01b0\u1eddng</th>';
-        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Ph\u00f2ng</th>';
-        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Kh\u00e1ch h\u00e0ng</th>';
-        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">D\u1ecbch v\u1ee5</th>';
-        html += '<th style="border:1px solid #ddd;padding:6px;text-align:left">Gi\u1edd</th>';
-        html += '<th style="border:1px solid #ddd;padding:6px;text-align:right">Ph\u00fat</th>';
-        html += '</tr></thead><tbody>';
-        var count = 0;
+
+        var schedMap = {};
         for (var i = 0; i < res.length; i++) {
-            var r = res[i];
-            if (!usedBeds[r.bId]) continue;
-            count++;
-            var vip = r.vipLevel === 'VV' ? '\u{1F451}\u{1F451}' : (r.vipLevel === 'V' ? '\u{1F451}' : (r.pri >= 3 ? '\u{1F451}' : ''));
-            html += '<tr>';
-            html += '<td style="border:1px solid #ddd;padding:5px;font-weight:600">' + r.bName + '</td>';
-            html += '<td style="border:1px solid #ddd;padding:5px">' + r.bRm + '</td>';
-            html += '<td style="border:1px solid #ddd;padding:5px">' + vip + ' ' + r.name + '</td>';
-            html += '<td style="border:1px solid #ddd;padding:5px;font-size:10px">' + (r.prod || '').split('\n')[0] + '</td>';
-            html += '<td style="border:1px solid #ddd;padding:5px;white-space:nowrap">' + r.sTime + ' - ' + r.eTime + '</td>';
-            html += '<td style="border:1px solid #ddd;padding:5px;text-align:right">' + r.dur + '</td>';
-            html += '</tr>';
+            if (!schedMap[res[i].bId]) schedMap[res[i].bId] = [];
+            schedMap[res[i].bId].push(res[i]);
         }
-        html += '</tbody></table>';
-        html += '<p style="margin:12px 0 0;font-size:10px;color:#999;text-align:right">T\u1ed5ng: ' + count + ' b\u1ec7nh nh\u00e2n</p>';
-        html += '</div>';
-        var tmp = document.createElement('div');
-        tmp.style.position = 'absolute';
-        tmp.style.left = '-9999px';
-        tmp.style.top = '0';
-        tmp.innerHTML = html;
-        document.body.appendChild(tmp);
-        html2canvas(tmp, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff', logging: false }).then(function(canvas) {
-            document.body.removeChild(tmp);
+
+        var T_MIN = 420, T_MAX = 1020, T_RANGE = T_MAX - T_MIN;
+        var LBL_W = 130, ROW_H = 48, TITLE_H = 30, HDR_H = 30, PAD = 12;
+        var timeW = 1020;
+        var totalW = LBL_W + timeW + PAD*2;
+        var totalH = TITLE_H + HDR_H + beds.length * ROW_H + PAD*2;
+
+        var hourStep = 60;
+
+        var colors = {
+            grid: '#e2e8f0', hdrBg: '#f1f5f9', hdrText: '#475569',
+            bedEven: '#ffffff', bedOdd: '#f8fafc',
+            labelText: '#1e293b', roomText: '#64748b',
+            normal: { bg: '#ecfdf5', border: '#6ee7b7', text: '#065f46' },
+            wait: { bg: '#fffbeb', border: '#fcd34d', text: '#92400e' },
+            vipV: { bg: '#f5f3ff', border: '#a78bfa', text: '#4c1d95' },
+            vipVV: { bg: '#fffbeb', border: '#fb923c', text: '#7c2d12' },
+            couple: { bg: '#fff1f2', border: '#fb7185', text: '#881337' },
+            manual: { bg: '#ecfdf5', border: '#34d399', text: '#065f46' },
+            lock: { bg: '#f1f5f9', border: '#cbd5e1', text: '#94a3b8' },
+        };
+
+        function getBlockStyle(i) {
+            if (i.lock) return colors.lock;
+            if (i.man) return colors.manual;
+            if (i.vipLevel === 'VV') return colors.vipVV;
+            if (i.vipLevel === 'V') return colors.vipV;
+            if (i.cfg && i.cfg.r) return colors.couple;
+            if (i.wait > 0) return colors.wait;
+            return colors.normal;
+        }
+
+        var canvas = document.createElement('canvas');
+        canvas.width = totalW * 2;
+        canvas.height = totalH * 2;
+        var ctx = canvas.getContext('2d');
+        ctx.scale(2, 2);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, totalW, totalH);
+
+        // Title row
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 14px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('S\u01a1 \u0111\u1ed3 l\u1ecbch truy\u1ec1n - ' + dFmt(cd), PAD, PAD + TITLE_H/2);
+
+        // Time header row
+        var hdrY = PAD + TITLE_H;
+        ctx.fillStyle = colors.hdrBg;
+        ctx.fillRect(0, hdrY, totalW, HDR_H);
+        ctx.fillStyle = colors.hdrText;
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        var time0X = LBL_W;
+        for (var h = 7; h <= 17; h++) {
+            var x = time0X + ((h * 60 - T_MIN) / T_RANGE) * timeW;
+            ctx.fillText(h + ':00', x, hdrY + HDR_H/2);
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, hdrY + HDR_H);
+            ctx.lineTo(x, totalH - PAD);
+            ctx.stroke();
+        }
+        // Bottom border of header
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, hdrY + HDR_H);
+        ctx.lineTo(totalW, hdrY + HDR_H);
+        ctx.stroke();
+
+        // Bed rows
+        for (var bi = 0; bi < beds.length; bi++) {
+            var b = beds[bi];
+            var y = hdrY + HDR_H + bi * ROW_H;
+            if (bi % 2 === 1) {
+                ctx.fillStyle = colors.bedOdd;
+                ctx.fillRect(LBL_W, y, timeW, ROW_H);
+            }
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, y + ROW_H);
+            ctx.lineTo(totalW - PAD, y + ROW_H);
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = colors.labelText;
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(b.name, PAD, y + ROW_H/2 - 5);
+            ctx.fillStyle = colors.roomText;
+            ctx.font = '10px Inter, sans-serif';
+            ctx.fillText(b.room, PAD, y + ROW_H/2 + 12);
+
+            // Collect items: from schedMap + locks from b.occ
+            var items = (schedMap[b.id] || []).slice();
+            if (b.occ) {
+                for (var oi = 0; oi < b.occ.length; oi++) {
+                    var o = b.occ[oi];
+                    if (o.type === 'l') {
+                        items.push({ lock: true, start: o.s, dur: o.e - o.s, name: 'K', prod: '', sTime: m2T(o.s), eTime: m2T(o.e) });
+                    }
+                }
+            }
+
+            for (var si = 0; si < items.length; si++) {
+                var item = items[si];
+                var lx = time0X + Math.max(0, ((item.start - T_MIN) / T_RANGE)) * timeW;
+                var w = Math.min(timeW - (lx - time0X), (item.dur / T_RANGE) * timeW);
+                if (w < 2) continue;
+                var cs = getBlockStyle(item);
+                var bx = lx + 1, by = y + 2, bw = w - 2, bh = ROW_H - 4;
+                var rx = 4;
+
+                // Rounded rect
+                ctx.fillStyle = cs.bg;
+                ctx.beginPath();
+                ctx.moveTo(bx + rx, by); ctx.lineTo(bx + bw - rx, by);
+                ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + rx);
+                ctx.lineTo(bx + bw, by + bh - rx);
+                ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - rx, by + bh);
+                ctx.lineTo(bx + rx, by + bh);
+                ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - rx);
+                ctx.lineTo(bx, by + rx);
+                ctx.quadraticCurveTo(bx, by, bx + rx, by);
+                ctx.closePath(); ctx.fill();
+
+                ctx.strokeStyle = cs.border;
+                ctx.lineWidth = item.man ? 2 : 1;
+                if (item.man) ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Text inside block
+                if (bw > 30) {
+                    ctx.fillStyle = cs.text;
+                    ctx.font = 'bold 10px Inter, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    var tx = bx + 4, ty = by + 3;
+                    var maxTw = bw - 8;
+                    var name = item.lock ? '\u{1F512} Kh\xf3a' : item.name;
+                    if (ctx.measureText(name).width > maxTw) {
+                        while (ctx.measureText(name + '\u2026').width > maxTw && name.length > 1)
+                            name = name.slice(0, -1);
+                        name += '\u2026';
+                    }
+                    ctx.fillText(name, tx, ty);
+                    if (!item.lock && bw > 50) {
+                        ctx.font = '9px Inter, sans-serif';
+                        var tStr = item.sTime + '-' + item.eTime;
+                        if (ctx.measureText(tStr).width > maxTw)
+                            tStr = item.dur + 'p';
+                        ctx.fillText(tStr, tx, ty + 14);
+                    }
+                }
+            }
+        }
+
+        canvas.toBlob(function(blob) {
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xu\u1ea5t \u1ea3nh'; }
             var link = document.createElement('a');
             link.download = 'lich_truyen_' + dFmt(cd).replace(/\//g, '-') + '.png';
-            link.href = canvas.toDataURL('image/png');
+            link.href = URL.createObjectURL(blob);
             link.click();
-        }).catch(function(err) {
-            document.body.removeChild(tmp);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-image"></i> Xu\u1ea5t \u1ea3nh'; }
-            console.error('exportGanttImage:', err);
+            URL.revokeObjectURL(link.href);
         });
     };
 
