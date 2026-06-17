@@ -349,12 +349,6 @@ async function doFetchSheet() {
           });
         }
       });
-      // Keep manually-overridden customers not in sheet anymore
-      for (var key in existing) {
-        if (!seen[key] && hasManualOverride(existing[key])) {
-          merged.push(existing[key]);
-        }
-      }
       merged = merged.filter(c => c.name || c.prod);
       if (merged.length) {
         var changed = merged.length !== state.custs.length || JSON.stringify(merged) !== JSON.stringify(state.custs);
@@ -484,11 +478,6 @@ app.post('/api/fetch-sheet', async (req, res) => {
         });
       }
     });
-    for (var key in existing) {
-      if (!seen[key] && hasManualOverride(existing[key])) {
-        merged.push(existing[key]);
-      }
-    }
     state.custs = merged.filter(c => c.name || c.prod);
     syncClients();
     res.json({ ok: true, count: state.custs.length });
