@@ -316,9 +316,9 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
     const clickAttr = isReadOnly ? '' : `onclick="openEdit('${i.id}',${i.bId},'${i.sTime}',${i.dur})"`;
 
     lane.innerHTML += `
-      <div ${dragAttr} ${clickAttr} class="absolute h-[62px] top-[2px] rounded-lg border p-1.5 cursor-pointer shadow-sm overflow-hidden flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
-        <div class="font-bold text-[10px] truncate leading-tight">${vIc} ${mIc} ${i.name}</div>
-        <div class="text-[9px] truncate text-slate-600 font-semibold">${i.prod}</div>
+      <div ${dragAttr} ${clickAttr} class="absolute h-[62px] top-[2px] rounded-lg border p-1.5 cursor-pointer shadow-sm overflow-visible flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
+        <div class="font-bold text-[11px] leading-tight whitespace-nowrap" style="text-shadow:0 0 4px white,0 0 4px white">${vIc} ${mIc} ${i.name}</div>
+        <div class="text-[9px] text-slate-600 font-semibold whitespace-nowrap">${i.prod}</div>
         <div class="text-[9px] font-medium mt-0.5 border-t border-slate-200/50 pt-0.5 flex justify-between">
           <span>${i.sTime}-${i.eTime}</span><span class="opacity-70">${i.dur}p</span>
         </div>
