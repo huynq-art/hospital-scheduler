@@ -118,7 +118,7 @@ function detectGender(name) {
 // --- Core Scheduling ---
 function calcSched(custs, bedDefs, curDate, incWait) {
   const list = custs.filter(c => (c.date || curDate) === curDate);
-  const beds = bedDefs.map(b => ({ ...b, nFree: 480, tot: 0, occ: [] }));
+  const beds = bedDefs.map(b => ({ ...b, nFree: 600, tot: 0, occ: [] }));
   const res = [];
   const genMap = {}; list.forEach(p => genMap[p.id] = p.gender || detectGender(p.name));
 
@@ -248,7 +248,7 @@ function ganttDrop(e, bedId) {
   if (!lane) return;
   const rect = lane.getBoundingClientRect();
   const xPct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  const newStart = 480 + Math.round(xPct * 600 / 5) * 5; // snap to 5 min
+  const newStart = 420 + Math.round(xPct * 600 / 5) * 5; // snap to 5 min
   const newEnd = newStart + dragData.dur;
   // Validate
   const beds = window.__bedState;
@@ -283,13 +283,13 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
     const util = Math.min(100, Math.round((b.tot/600)*100));
     const dropAttr = isReadOnly ? '' : `ondragover="event.preventDefault()" ondrop="ganttDrop(event, ${b.id})"`;
     html += `
-      <div class="grid grid-cols-11 items-center relative z-10" style="min-height:82px">
+      <div class="grid grid-cols-12 items-center relative z-10" style="min-height:82px">
         <div class="col-span-1 pr-2 leading-tight">
           <div class="font-bold text-sm">${b.name}</div>
           <span class="text-[10px] ${b.isT2?'bg-violet-100 text-violet-700':'bg-slate-100 text-slate-500'} px-1.5 py-0.5 rounded font-bold">${b.room}</span>
           <div class="text-[9px] text-slate-400 mt-0.5">${util}%</div>
         </div>
-        <div class="col-span-10 relative bg-slate-50 border rounded-xl h-[68px] w-full" id="lane-${b.id}" ${dropAttr}></div>
+        <div class="col-span-11 relative bg-slate-50 border rounded-xl h-[68px] w-full" id="lane-${b.id}" ${dropAttr}></div>
       </div>`;
   });
   document.getElementById(containerId).innerHTML = html;
@@ -298,7 +298,7 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
   res.forEach(i => {
     const lane = document.getElementById(`lane-${i.bId}`);
     if(!lane) return;
-    const lPct = Math.max(0, ((i.start - 480)/600)*100);
+    const lPct = Math.max(0, ((i.start - 420)/600)*100);
     const wPct = Math.min(100-lPct, (i.dur/600)*100);
 
     let cl = i.vipLevel === 'VV' ? (i.man ? "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300 border-dashed border-2" : "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300")
@@ -329,7 +329,7 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
   beds.forEach(b => {
     b.occ.forEach(o => {
       if(o.type==='l') {
-        const lPct = Math.max(0, ((o.s-480)/600)*100);
+        const lPct = Math.max(0, ((o.s-420)/600)*100);
         const wPct = Math.min(100-lPct, ((o.e-o.s)/600)*100);
         const lane = document.getElementById(`lane-${b.id}`);
         if(lane) lane.innerHTML += `
