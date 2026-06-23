@@ -106,14 +106,12 @@
             </div>
             <div class="p-4 overflow-x-auto custom-scrollbar">
                 <div class="min-w-[2400px] relative pb-4" id="ganttContainer">
-                    <div class="grid grid-cols-12 border-b border-slate-800 pb-2 mb-4 text-xs font-semibold text-slate-500 text-center">
+                    <div class="grid grid-cols-12 border-b border-slate-800 pb-2 mb-4 text-xs font-semibold text-slate-500">
                         <div class="col-span-1 text-left pl-2">GIƯỜNG</div>
-                        <div class="col-span-11 grid grid-cols-11 text-center">
-                            <div>07:00</div><div>08:00</div><div>09:00</div><div>10:00</div><div>11:00</div><div>12:00</div><div>13:00</div><div>14:00</div><div>15:00</div><div>16:00</div><div>17:00</div>
-                        </div>
+                        <div id="salesGanttTimeHeader" class="col-span-11 relative h-4"></div>
                     </div>
                     <div class="space-y-4 relative">
-                        <div id="salesBgGridLines" class="absolute inset-y-0 left-[8.33%] right-0 grid grid-cols-11 pointer-events-none z-0"></div>
+                        <div id="salesBgGridLines" class="absolute inset-y-0 left-[8.33%] right-0 pointer-events-none z-0"></div>
                         <div id="salesBedLanes" class="space-y-3 relative z-10"></div>
                         <div id="timeNowIndicator" class="absolute top-0 bottom-0 z-20 pointer-events-none" style="left:0%; display:none;">
                             <div class="h-full" style="width:2px; background:#ef4444; position:relative;">
@@ -286,18 +284,51 @@
         document.getElementById('salesTotalCust').textContent = res.length;
         document.getElementById('salesAvgWait').textContent = res.length ? `${Math.round(tw/res.length)}p` : '0p';
         document.getElementById('salesDelayed').textContent = td;
-        const util = Math.min(100, Math.round((beds.reduce((a,b)=>a+b.tot,0)/(600*9))*100));
+        const tRange = 600;
+        const util = Math.min(100, Math.round((beds.reduce((a,b)=>a+b.tot,0)/(tRange*9))*100));
         document.getElementById('salesUtilization').textContent = `${util}%`;
 
+        // Compute dynamic time range
+        let tMin = 420;
+        if (res.length > 0) {
+            const earliest = Math.min(...res.map(i => i.start));
+            tMin = Math.max(420, Math.min(480, Math.floor(earliest / 60) * 60));
+        }
+        window.__ganttMin = tMin;
+        window.__ganttRange = tRange;
+
+        // Time header labels
+        const headerEl = document.getElementById('salesGanttTimeHeader');
+        if (headerEl) {
+            headerEl.innerHTML = '';
+            for (let h = 0; h <= 10; h++) {
+                const hour = Math.floor(tMin / 60) + h;
+                const div = document.createElement('div');
+                div.className = 'absolute text-[10px] font-semibold text-slate-500';
+                div.style.cssText = `left:${h*10}%;transform:translateX(-50%)`;
+                div.textContent = `${String(hour).padStart(2,'0')}:00`;
+                headerEl.appendChild(div);
+            }
+        }
+
         // Grid lines
-        document.getElementById('salesBgGridLines').innerHTML = Array(10).fill('<div class="border-l border-dashed border-slate-800 h-full"></div>').join('');
+        const gridEl = document.getElementById('salesBgGridLines');
+        if (gridEl) {
+            gridEl.innerHTML = '';
+            for (let h = 0; h <= 10; h++) {
+                const line = document.createElement('div');
+                line.className = 'absolute top-0 bottom-0 w-px bg-slate-800';
+                line.style.cssText = `left:${h*10}%`;
+                gridEl.appendChild(line);
+            }
+        }
 
         // Render lanes
         let html = '';
         beds.forEach(b => {
-            const utilBar = Math.min(100, Math.round((b.tot/600)*100));
+            const utilBar = Math.min(100, Math.round((b.tot/tRange)*100));
             html += `
-                <div class="grid grid-cols-11 items-center relative z-10" style="min-height:72px">
+                <div class="grid grid-cols-12 items-center relative z-10" style="min-height:72px">
                     <div class="col-span-1 pr-2 leading-tight">
                         <div class="font-bold text-sm text-white">${b.name}</div>
                         <span class="text-[10px] ${b.isT2?'bg-violet-900/50 text-violet-300':'bg-slate-800 text-slate-400'} px-1.5 py-0.5 rounded font-bold">${b.room}</span>
@@ -307,7 +338,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-span-10 relative bg-slate-800/30 border border-slate-800 rounded-xl h-[66px] w-full" id="slane-${b.id}"></div>
+                    <div class="col-span-11 relative bg-slate-800/30 border border-slate-800 rounded-xl h-[66px] w-full" id="slane-${b.id}"></div>
                 </div>`;
         });
         document.getElementById('salesBedLanes').innerHTML = html;
@@ -316,8 +347,8 @@
         res.forEach(i => {
             const lane = document.getElementById(`slane-${i.bId}`);
             if(!lane) return;
-            const lPct = Math.max(0, ((i.start - 480)/600)*100);
-            const wPct = Math.min(100-lPct, (i.dur/600)*100);
+            const lPct = Math.max(0, ((i.start - tMin)/tRange)*100);
+            const wPct = Math.min(100-lPct, (i.dur/tRange)*100);
 
             let cl = i.man ? "border-dashed border-2 ring-2 ring-emerald-400/50 border-emerald-500 bg-emerald-900/30 text-emerald-200"
                 : i.v ? "bg-violet-900/30 border-violet-500/50 text-violet-200"
@@ -329,9 +360,9 @@
             const mIc = i.man ? '✍️' : '';
 
             lane.innerHTML += `
-                <div class="absolute h-[60px] top-[2px] rounded-lg border p-1.5 overflow-hidden flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
-                    <div class="font-bold text-[10px] truncate leading-tight text-white">${vIc} ${mIc} ${i.name}</div>
-                    <div class="text-[9px] truncate text-slate-400 font-semibold">${i.prod}</div>
+                <div class="absolute h-[60px] top-[2px] rounded-lg border p-1.5 overflow-visible flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
+                    <div class="font-bold text-[11px] leading-tight whitespace-nowrap text-white" style="text-shadow:0 0 4px #0f172a,0 0 4px #0f172a" title="${i.name} - ${i.prod}">${vIc} ${mIc} ${i.name}</div>
+                    <div class="text-[9px] text-slate-400 font-semibold whitespace-nowrap" title="${i.prod}">${i.prod}</div>
                     <div class="text-[8px] font-medium flex justify-between text-slate-500">
                         <span>${i.sTime}-${i.eTime}</span><span class="opacity-70">${i.dur}p</span>
                     </div>
@@ -342,8 +373,8 @@
         beds.forEach(b => {
             b.occ.forEach(o => {
                 if(o.type==='l') {
-                    const lPct = Math.max(0, ((o.s-480)/600)*100);
-                    const wPct = Math.min(100-lPct, ((o.e-o.s)/600)*100);
+                    const lPct = Math.max(0, ((o.s-tMin)/tRange)*100);
+                    const wPct = Math.min(100-lPct, ((o.e-o.s)/tRange)*100);
                     const lane = document.getElementById(`slane-${b.id}`);
                     if(lane) lane.innerHTML += `
                         <div class="absolute h-[56px] top-[2px] rounded-lg border border-dashed bg-striped-blocked flex flex-col items-center justify-center pointer-events-none" style="left:${lPct}%; width:${wPct}%">
@@ -420,8 +451,10 @@
 
         // Move time indicator
         const totalMin = now.getHours()*60 + now.getMinutes();
-        if (totalMin >= 420 && totalMin <= 1020) {
-            const pct = ((totalMin - 420) / 600) * 100;
+        const tMin = window.__ganttMin || 420;
+        const tRange = window.__ganttRange || 600;
+        if (totalMin >= tMin && totalMin <= tMin + tRange) {
+            const pct = ((totalMin - tMin) / tRange) * 100;
             const el = document.getElementById('timeNowIndicator');
             el.style.left = `${pct}%`;
             el.style.display = 'block';

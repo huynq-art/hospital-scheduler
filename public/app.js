@@ -248,7 +248,9 @@ function ganttDrop(e, bedId) {
   if (!lane) return;
   const rect = lane.getBoundingClientRect();
   const xPct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  const newStart = 420 + Math.round(xPct * 600 / 5) * 5; // snap to 5 min
+  const tMin = window.__ganttMin || 420;
+  const tRange = window.__ganttRange || 600;
+  const newStart = tMin + Math.round(xPct * tRange / 5) * 5; // snap to 5 min
   const newEnd = newStart + dragData.dur;
   // Validate
   const beds = window.__bedState;
@@ -277,10 +279,48 @@ function ganttDrop(e, bedId) {
 function renderGantt(containerId, scheduleData, isReadOnly) {
   const { res, beds } = scheduleData;
   window.__bedState = beds;
-  let html = '';
 
+  // Compute dynamic time range based on earliest customer
+  const tRange = 600;
+  let tMin = 420; // default 7:00
+  if (res.length > 0) {
+    const earliest = Math.min(...res.map(i => i.start));
+    tMin = Math.max(420, Math.min(480, Math.floor(earliest / 60) * 60));
+  }
+  window.__ganttMin = tMin;
+  window.__ganttRange = tRange;
+
+  // Generate time header labels
+  const headerId = containerId === 'dynamicBedLanes' ? 'ganttTimeHeader' : 'salesGanttTimeHeader';
+  const headerEl = document.getElementById(headerId);
+  if (headerEl) {
+    headerEl.innerHTML = '';
+    for (let h = 0; h <= 10; h++) {
+      const hour = Math.floor(tMin / 60) + h;
+      const div = document.createElement('div');
+      div.className = 'absolute text-[10px] font-semibold text-slate-400';
+      div.style.cssText = `left:${h*10}%;transform:translateX(-50%)`;
+      div.textContent = `${String(hour).padStart(2,'0')}:00`;
+      headerEl.appendChild(div);
+    }
+  }
+
+  // Generate vertical grid lines
+  const gridId = containerId === 'dynamicBedLanes' ? 'bgGridLines' : 'salesBgGridLines';
+  const gridEl = document.getElementById(gridId);
+  if (gridEl) {
+    gridEl.innerHTML = '';
+    for (let h = 0; h <= 10; h++) {
+      const line = document.createElement('div');
+      line.className = 'absolute top-0 bottom-0 w-px bg-slate-200';
+      line.style.cssText = `left:${h*10}%`;
+      gridEl.appendChild(line);
+    }
+  }
+
+  let html = '';
   beds.forEach(b => {
-    const util = Math.min(100, Math.round((b.tot/600)*100));
+    const util = Math.min(100, Math.round((b.tot/tRange)*100));
     const dropAttr = isReadOnly ? '' : `ondragover="event.preventDefault()" ondrop="ganttDrop(event, ${b.id})"`;
     html += `
       <div class="grid grid-cols-12 items-center relative z-10" style="min-height:82px">
@@ -298,8 +338,8 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
   res.forEach(i => {
     const lane = document.getElementById(`lane-${i.bId}`);
     if(!lane) return;
-    const lPct = Math.max(0, ((i.start - 420)/600)*100);
-    const wPct = Math.min(100-lPct, (i.dur/600)*100);
+    const lPct = Math.max(0, ((i.start - tMin)/tRange)*100);
+    const wPct = Math.min(100-lPct, (i.dur/tRange)*100);
 
     let cl = i.vipLevel === 'VV' ? (i.man ? "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300 border-dashed border-2" : "bg-amber-50 border-orange-400 text-orange-900 ring-2 ring-orange-300")
       : i.vipLevel === 'V' ? (i.man ? "bg-violet-50 border-violet-400 text-violet-900 border-dashed border-2 ring-2 ring-violet-300" : "bg-violet-50 border-violet-400 text-violet-900")
@@ -316,7 +356,7 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
     const clickAttr = isReadOnly ? '' : `onclick="openEdit('${i.id}',${i.bId},'${i.sTime}',${i.dur})"`;
 
     lane.innerHTML += `
-      <div ${dragAttr} ${clickAttr} class="absolute h-[62px] top-[2px] rounded-lg border p-1.5 cursor-pointer shadow-sm overflow-visible flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
+      <div ${dragAttr} ${clickAttr} title="${i.name} - ${i.prod} - ${i.sTime}" class="absolute h-[62px] top-[2px] rounded-lg border p-1.5 cursor-pointer shadow-sm overflow-visible flex flex-col justify-between ${cl}" style="left:${lPct}%; width:${wPct}%">
         <div class="font-bold text-[11px] leading-tight whitespace-nowrap" style="text-shadow:0 0 4px white,0 0 4px white">${vIc} ${mIc} ${i.name}</div>
         <div class="text-[9px] text-slate-600 font-semibold whitespace-nowrap">${i.prod}</div>
         <div class="text-[9px] font-medium mt-0.5 border-t border-slate-200/50 pt-0.5 flex justify-between">
@@ -329,8 +369,8 @@ function renderGantt(containerId, scheduleData, isReadOnly) {
   beds.forEach(b => {
     b.occ.forEach(o => {
       if(o.type==='l') {
-        const lPct = Math.max(0, ((o.s-420)/600)*100);
-        const wPct = Math.min(100-lPct, ((o.e-o.s)/600)*100);
+        const lPct = Math.max(0, ((o.s-tMin)/tRange)*100);
+        const wPct = Math.min(100-lPct, ((o.e-o.s)/tRange)*100);
         const lane = document.getElementById(`lane-${b.id}`);
         if(lane) lane.innerHTML += `
           <div class="absolute h-[62px] top-[2px] rounded-lg border border-dashed bg-striped-blocked flex flex-col items-center justify-center pointer-events-none" style="left:${lPct}%; width:${wPct}%">
